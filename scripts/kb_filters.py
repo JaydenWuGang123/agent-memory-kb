@@ -232,6 +232,16 @@ def should_skip_conversation(
         return True
 
     clean_title = clean_ide_prompt(title or "")
+    excluded_topic_pat = nf.get("excluded_topic_regex")
+    if excluded_topic_pat:
+        opening_texts = [clean_title] + [
+            clean_ide_prompt(m.get("text") or "")[:600]
+            for m in messages[:4]
+            if not m.get("context")
+        ]
+        if any(t and re.search(excluded_topic_pat, t, re.I) for t in opening_texts):
+            return True
+
     probe_pat = nf.get("probe_title_regex")
     if probe_pat and len(messages) <= 6 and re.search(probe_pat, clean_title, re.I):
         return True

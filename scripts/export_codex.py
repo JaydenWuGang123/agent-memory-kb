@@ -207,18 +207,31 @@ def main():
     previous = {x["id"]: x for x in json.loads(manifest_path.read_text())} if manifest_path.exists() else {}
     state = connect(args.codex_home / "state_5.sqlite")
     history = connect(args.codex_home / "thread_history_1.sqlite")
-    all_threads = list(state.execute("SELECT id,title,cwd,source,thread_source,rollout_path,created_at,updated_at,archived FROM threads"))
+    cols = {r[1] for r in state.execute("PRAGMA table_info(threads)").fetchall()}
+    sel_cols = "id,title,cwd,source,thread_source,rollout_path,created_at,updated_at,archived"
+    if "creator_user_id" in cols and "creator_account_id" in cols:
+        sel_cols += ",creator_user_id,creator_account_id"
+    all_threads = list(state.execute(f"SELECT {sel_cols} FROM threads"))
     threads = [row for row in all_threads if row["thread_source"] not in {"subagent", "guardian_review"}
                and not row["source"].startswith('{"subagent"')]
     projections = {row[0]: row[1] for row in history.execute("SELECT thread_id,next_rollout_byte_offset FROM thread_history_projection_state")}
     synced_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     noise_cfg = load_noise_filter(output)
+    excluded_uids = set(noise_cfg.get("excluded_codex_user_ids") or [])
+    excluded_aids = set(noise_cfg.get("excluded_codex_account_ids") or [])
     changed = skipped = missing = pruned_noise = 0
     for thread in threads:
         thread_id = thread["id"]
         source = Path(thread["rollout_path"])
         relative = f"对话/Codex/{thread_id}.md"
         target = output / relative
+        t_uid = thread["creator_user_id"] if "creator_user_id" in cols else None
+        t_aid = thread["creator_account_id"] if "creator_account_id" in cols else None
+        if (t_uid and t_uid in excluded_uids) or (t_aid and t_aid in excluded_aids):
+            previous.pop(thread_id, None)
+            target.unlink(missing_ok=True)
+            pruned_noise += 1
+            continue
         if not source.is_file():
             missing += 1
             if previous.get(thread_id, {}).get("message_count", -1) == 0:

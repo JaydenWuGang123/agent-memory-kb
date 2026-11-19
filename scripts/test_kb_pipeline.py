@@ -97,6 +97,8 @@ class TestDoctorChecks(unittest.TestCase):
         self.assertTrue(kb_filters.should_skip_conversation("id2", "你好", [{"role": "user", "text": "你好"}, {"role": "assistant", "text": "你好！请问有什么可以帮你的吗？"}]))
         self.assertFalse(kb_filters.should_skip_conversation("id3", "你好", [{"role": "user", "text": "你好"}, {"role": "user", "text": "帮我改一下工资条接口"}]))
         self.assertFalse(kb_filters.should_skip_conversation("id4", "你好", [{"role": "user", "text": "你好"}, {"role": "assistant", "text": "看到你在 /Users/dev/chat-app 中断了。"}]))
+        self.assertTrue(kb_filters.should_skip_conversation("id5", "帮她做电商设计主图", [{"role": "user", "text": "帮她做电商设计主图"}] * 6, {"excluded_topic_regex": "电商设计|商品主图"}))
+        self.assertFalse(kb_filters.should_skip_conversation("id6", "工资条多批次接口优化", [{"role": "user", "text": "工资条多批次接口优化"}] * 6, {"excluded_topic_regex": "电商设计|商品主图"}))
 
     def test_broken_links_and_missing_citations(self):
         with tempfile.TemporaryDirectory() as td:
