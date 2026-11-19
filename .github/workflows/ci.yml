@@ -38,4 +38,4 @@ jobs:
           PERSONAL_KB_SKIP_KEYCHAIN: "1"
         run: |
           python3 init_kb.py --root /tmp/test-agent-memory-kb
-          python3 /tmp/test-agent-memory-kb/_同步/kb_doctor.py --json
+          python3 /tmp/test-agent-memory-kb/_同步/kb_doctor.py --root /tmp/test-agent-memory-kb --skip-external-checks
