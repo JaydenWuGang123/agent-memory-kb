@@ -77,6 +77,11 @@ def kb_overview_data(root: Path = DEFAULT_KB_ROOT) -> dict:
                 break
             if in_health and line.strip():
                 health_lines.append(line.strip())
+    if health_lines and all(
+        not any(bad in ln for bad in ("异常", "失败", "违规", "超标", "死链", "泄漏", "告警", "ERROR", "WARN", "false"))
+        for ln in health_lines
+    ):
+        health_lines = ["healthy"]
     return {
         "kb_root": str(root),
         "index_md": index_path.read_text(encoding="utf-8", errors="replace") if index_path.is_file() else "",
@@ -92,7 +97,7 @@ def _compact_json(obj: object) -> str:
 def _trim_hits(hits: list[dict]) -> list[dict]:
     cleaned: list[dict] = []
     for h in hits:
-        cleaned.append({k: v for k, v in h.items() if v not in ("", None, [])})
+        cleaned.append({k: v for k, v in h.items() if k not in ("abs_path", "tier") and v not in ("", None, [])})
     return cleaned
 
 
