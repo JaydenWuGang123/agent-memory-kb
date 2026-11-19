@@ -112,7 +112,7 @@ def kb_search_data(
     role: str = "all",
     cwd: str = "",
     since: str = "",
-    limit: int = 5,
+    limit: int = 8,
     per_conv: int = 2,
     root: Path = DEFAULT_KB_ROOT,
 ) -> dict:
@@ -153,7 +153,7 @@ def kb_search_data(
 def kb_project_context_data(
     cwd_or_project: str,
     root: Path = DEFAULT_KB_ROOT,
-    include_recent: bool = False,
+    include_recent: bool = True,
 ) -> dict:
     root = root.resolve()
     key = Path(cwd_or_project).name.lower() if "/" in cwd_or_project else cwd_or_project.strip().lower()
@@ -188,8 +188,8 @@ def kb_project_context_data(
 
 
 def kb_mistakes_data(
-    include_pending: bool = False,
-    full_book: bool = False,
+    include_pending: bool = True,
+    full_book: bool = True,
     root: Path = DEFAULT_KB_ROOT,
 ) -> dict:
     root = root.resolve()
@@ -209,7 +209,7 @@ def kb_mistakes_data(
     return payload
 
 
-def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 100, root: Path = DEFAULT_KB_ROOT) -> dict:
+def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 160, root: Path = DEFAULT_KB_ROOT) -> dict:
     root = root.resolve()
     raw = (rel_path or "").strip().lstrip("/")
     target = (root / raw).resolve()
@@ -246,7 +246,7 @@ def kb_search_query(
     role: str = "all",
     cwd: str = "",
     since: str = "",
-    limit: int = 5,
+    limit: int = 8,
 ) -> str:
     """Search the local 5-source Agent Memory KB using Hybrid ONNX Semantic Vector + SQLite FTS5 BM25 fusion."""
     return _compact_json(
@@ -255,19 +255,19 @@ def kb_search_query(
 
 
 @mcp.tool()
-def kb_project_context(cwd_or_project: str, include_recent: bool = False) -> str:
-    """Return active project breakpoints, Git status snapshot, and optional recent archived turns for a workspace or repo name."""
+def kb_project_context(cwd_or_project: str, include_recent: bool = True) -> str:
+    """Return active project breakpoints, Git status snapshot, and recent archived turns for a workspace or repo name."""
     return _compact_json(kb_project_context_data(cwd_or_project, include_recent=include_recent))
 
 
 @mcp.tool()
-def kb_mistakes_and_guardrails(include_pending: bool = False, full_book: bool = False) -> str:
-    """Return concise top AI mistake-book guardrails by default; set full_book=True or include_pending=True when doing retrospect."""
+def kb_mistakes_and_guardrails(include_pending: bool = True, full_book: bool = True) -> str:
+    """Return the cross-agent AI mistake book guardrails, merged patterns, and pending high-friction queue."""
     return _compact_json(kb_mistakes_data(include_pending=include_pending, full_book=full_book))
 
 
 @mcp.tool()
-def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 100) -> str:
+def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 160) -> str:
     """Read a line-bounded plain-text slice of any Markdown/JSON file strictly inside the KB root."""
     d = kb_read_note_data(rel_path=rel_path, start_line=start_line, max_lines=max_lines)
     return f"# {d['path']} (lines {d['start_line']}-{d['end_line']}/{d['total_lines']})\n{d['content']}"
