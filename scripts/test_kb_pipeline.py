@@ -790,5 +790,33 @@ class TestIcloudMirrorResilience(unittest.TestCase):
             self.assertFalse(orphan.exists())
 
 
+class TestInitGeneralProfile(unittest.TestCase):
+    def test_init_general_profile_passes_doctor(self):
+        repo_root = SYNC_DIR.parent
+        init_script = repo_root / "init_kb.py"
+        if not init_script.exists():
+            self.skipTest("init_kb.py not present in parent directory")
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "general-kb"
+            subprocess.run(
+                [sys.executable, str(init_script), "--root", str(target), "--profile", "general"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            proj = (target / "笔记" / "进行中的项目.md").read_text(encoding="utf-8")
+            mistake = (target / "笔记" / "AI协作错题本.md").read_text(encoding="utf-8")
+            self.assertIn("进行中的目标与事项看板", proj)
+            self.assertIn("通用非研发版", mistake)
+            doc_out = subprocess.run(
+                [sys.executable, str(target / "_同步" / "kb_doctor.py"), "--root", str(target), "--skip-external-checks"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            report = json.loads(doc_out.stdout)
+            self.assertTrue(report["healthy"], f"Doctor failed for general profile: {report}")
+
+
 if __name__ == "__main__":
     unittest.main()

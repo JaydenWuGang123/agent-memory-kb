@@ -26,16 +26,40 @@
 
 ---
 
+## Who Is This For?
+
+Whether you write code or simply use **Codex / Claude Code / Antigravity / ChatGPT** for daily work, `agent-memory-kb` gives your AI one persistent local brain:
+
+| Role | What You Get Out of the Box |
+| --- | --- |
+| **Developers (Frontend / Backend / Indie)** | Multi-repo live Git probe, 10-second cross-agent handoff, coding mistake-book guardrails (`--profile dev`) |
+| **Product Managers & Operations** | Auto-archive every PRD discussion & research thread, keep confirmed decisions separated from guesses (`--profile general`) |
+| **Creators, Writers & Solo Founders** | Capture ideas & script iterations automatically, teach Codex your tone/style and avoid repeating edits (`--profile general`) |
+| **Lifelong Learners & Investors** | Track long-term reading, study plans, and personal rules across months; search exact past quotes in milliseconds (`--profile general`) |
+
+---
+
 ## 5-Minute Quickstart
 
-### 1. Clone & Initialize (Pure Python 3.9+ Stdlib)
+### Option A: Zero-Command Setup (Recommended for Codex / Claude / Antigravity Users)
+
+Don't want to run terminal commands or edit JSON by hand? **Paste this single prompt directly into Codex, Claude Code, or Antigravity**:
+
+```text
+Please clone https://github.com/JaydenWuGang123/agent-memory-kb and initialize it into ~/personal-kb (use --profile general if I am not a software developer, otherwise --profile dev). Complete the first sync, run kb_doctor.py, wire up the read-only MCP server, and add the global agent rules. Explain each step in plain language and ask me before any optional backup setup.
+```
+
+### Option B: Manual Setup (Pure Python 3.9+ Stdlib)
 
 ```bash
 git clone https://github.com/JaydenWuGang123/agent-memory-kb.git
 cd agent-memory-kb
 
-# Bootstrap a fresh local KB repo (defaults to ~/personal-kb)
-python3 init_kb.py --root ~/personal-kb
+# For developers (default, includes Git repo probe):
+python3 init_kb.py --root ~/personal-kb --profile dev
+
+# For non-developers / PMs / creators (goals & expression-preference templates):
+python3 init_kb.py --root ~/personal-kb --profile general
 ```
 
 ### 2. Run Your First Sync, Health Check & Search

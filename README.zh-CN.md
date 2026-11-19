@@ -26,16 +26,40 @@
 
 ---
 
+## 谁适合用？（不只是程序员！）
+
+只要你平时会用 **Codex / Claude Code / Cursor / Antigravity / ChatGPT** 干活，不管写不写代码，都能给你的 AI 装上同一个永久本地外脑：
+
+| 使用角色 | 开箱即得的价值 |
+| --- | --- |
+| **研发工程师（前端 / 后端 / 独立开发）** | 多仓库实时 Git 探针、10 秒跨工具接力、代码/联调错题本自动防重犯（`--profile dev`） |
+| **产品经理 / 运营 / 项目管理** | 自动存下每次需求讨论与竞品调研，沉淀已确认口径，换窗口不再重讲业务背景（`--profile general`） |
+| **自媒体 / 内容创作者 / 一人公司** | 自动归档灵感、选题与脚本打磨过程，让 Codex 记住你的表达风格与避坑偏好（`--profile general`） |
+| **学习 / 读书 / 个人规划与理财** | 跨月追踪学习进度与长期原则，毫秒级翻出三个月前自己定下的纪律（`--profile general`） |
+
+---
+
 ## 5 分钟快速上手
 
-### 1. 克隆并一键初始化（仅需 Python 3.9+ 标准库）
+### 方式 A：一句话让 Codex 替你全自动装好（不会敲命令直接用这个！）
+
+根本不用自己打开终端敲命令、改 JSON，**直接把下面这句话发给你的 Codex / Claude Code / Antigravity**：
+
+```text
+请帮我克隆 https://github.com/JaydenWuGang123/agent-memory-kb 并初始化到 ~/personal-kb（如果我不是程序员请加 --profile general，否则用 --profile dev）。按项目说明帮我完成首次同步、kb_doctor 健康体检、只读 MCP 接入和全局规则配置，全程用大白话告诉我结果；涉及可选云备份配置时先问我再操作。
+```
+
+### 方式 B：手动命令行初始化（仅需 Python 3.9+ 标准库）
 
 ```bash
 git clone https://github.com/JaydenWuGang123/agent-memory-kb.git
 cd agent-memory-kb
 
-# 在 ~/personal-kb（或通过 --root 指定任意目录）生成独立本地知识库
-python3 init_kb.py --root ~/personal-kb
+# 研发模式（默认，含活跃代码仓库 Git 探针）：
+python3 init_kb.py --root ~/personal-kb --profile dev
+
+# 通用非研发模式（PM / 创作者 / 个人规划，含目标看板与表达偏好避坑本）：
+python3 init_kb.py --root ~/personal-kb --profile general
 ```
 
 ### 2. 运行首次同步、健康体检与中文秒查
