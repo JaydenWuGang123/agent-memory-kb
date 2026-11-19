@@ -41,11 +41,11 @@ After running `python3 init_kb.py --root ~/personal-kb`:
 
 | Tool | Parameters & Defaults | Purpose | Security |
 | --- | --- | --- | --- |
-| `kb_overview()` | none | Returns `INDEX.md`, living-note listing, and SQLite index statistics | Read-only |
-| `kb_project_context(cwd_or_project)` | `cwd_or_project: str` | Extracts matching active project checkpoints & live Git probe status from `笔记/进行中的项目.md` | Read-only |
-| `kb_mistakes_and_guardrails(include_pending=True)` | `include_pending: bool = True` | Returns top anti-mistake guardrails from `笔记/AI协作错题本.md` plus optional pending retrospect queue | Read-only |
-| `kb_search_query(query, mode="hybrid", source="all", limit=8)` | `query: str`, `mode: "fts"\|"semantic"\|"hybrid"`, `source: "all"\|"notes"\|"codex"\|...`, `limit: int` | Runs FTS5 / semantic / RRF hybrid search and returns ranked JSON snippets with file paths & dates | Read-only |
-| `kb_read_note(rel_path, start_line=1, max_lines=160)` | `rel_path: str`, `start_line: int = 1`, `max_lines: int = 160` | Reads bounded line ranges of a note inside the KB | **Strict path-traversal guard** confined to KB root |
+| `kb_overview()` | none | Returns compact JSON with `INDEX.md`, health snapshot, and Top guardrails | Read-only |
+| `kb_project_context(cwd_or_project, include_recent=False)` | `cwd_or_project: str`, `include_recent: bool = False` | Extracts matching active project checkpoints & live Git probe status (queries recent hits only when needed) | Read-only |
+| `kb_mistakes_and_guardrails(include_pending=False, full_book=False)` | `include_pending: bool = False`, `full_book: bool = False` | Returns concise Top guardrails by default; pass `full_book=True` / `include_pending=True` for retrospect | Read-only |
+| `kb_search_query(query, mode="hybrid", source="all", limit=5)` | `query: str`, `mode: "fts"\|"semantic"\|"hybrid"`, `source: "all"\|"notes"\|...`, `limit: int = 5` | Runs FTS5 / semantic / RRF hybrid search and returns compact trimmed JSON snippets | Read-only |
+| `kb_read_note(rel_path, start_line=1, max_lines=100)` | `rel_path: str`, `start_line: int = 1`, `max_lines: int = 100` | Reads bounded plain-text line ranges (no JSON escape bloat) inside the KB | **Strict path-traversal guard** confined to KB root |
 
 Example MCP registration ([`examples/mcp_config.example.json`](../examples/mcp_config.example.json)):
 

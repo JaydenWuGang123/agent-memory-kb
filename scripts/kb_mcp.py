@@ -85,6 +85,17 @@ def kb_overview_data(root: Path = DEFAULT_KB_ROOT) -> dict:
     }
 
 
+def _compact_json(obj: object) -> str:
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+
+
+def _trim_hits(hits: list[dict]) -> list[dict]:
+    cleaned: list[dict] = []
+    for h in hits:
+        cleaned.append({k: v for k, v in h.items() if v not in ("", None, [])})
+    return cleaned
+
+
 def kb_search_data(
     query: str,
     mode: str = "hybrid",
@@ -92,7 +103,7 @@ def kb_search_data(
     role: str = "all",
     cwd: str = "",
     since: str = "",
-    limit: int = 8,
+    limit: int = 5,
     per_conv: int = 2,
     root: Path = DEFAULT_KB_ROOT,
 ) -> dict:
@@ -109,7 +120,8 @@ def kb_search_data(
             eff_per_conv,
         )
     if mode == "fts" or is_regex:
-        return {"query": query, "mode": "fts", "count": len(fts_hits), "results": fts_hits[:eff_limit]}
+        trimmed = _trim_hits(fts_hits[:eff_limit])
+        return {"query": query, "mode": "fts", "count": len(trimmed), "results": trimmed}
 
     emb = _get_embedder()
     vec_hits = kb_embed.query_vectors(
@@ -119,14 +131,21 @@ def kb_search_data(
         embedder=emb if emb.is_available() else None,
     )
     if mode == "vector":
-        return {"query": query, "mode": "vector", "count": len(vec_hits), "results": vec_hits[:eff_limit]}
+        trimmed = _trim_hits(vec_hits[:eff_limit])
+        return {"query": query, "mode": "vector", "count": len(trimmed), "results": trimmed}
     if not vec_hits:
-        return {"query": query, "mode": "fts_fallback", "count": len(fts_hits), "results": fts_hits[:eff_limit]}
+        trimmed = _trim_hits(fts_hits[:eff_limit])
+        return {"query": query, "mode": "fts_fallback", "count": len(trimmed), "results": trimmed}
     fused = kb_search.rrf_fuse(fts_hits, vec_hits, limit=eff_limit, per_conv=eff_per_conv)
-    return {"query": query, "mode": "hybrid", "count": len(fused), "results": fused}
+    trimmed = _trim_hits(fused)
+    return {"query": query, "mode": "hybrid", "count": len(trimmed), "results": trimmed}
 
 
-def kb_project_context_data(cwd_or_project: str, root: Path = DEFAULT_KB_ROOT) -> dict:
+def kb_project_context_data(
+    cwd_or_project: str,
+    root: Path = DEFAULT_KB_ROOT,
+    include_recent: bool = False,
+) -> dict:
     root = root.resolve()
     key = Path(cwd_or_project).name.lower() if "/" in cwd_or_project else cwd_or_project.strip().lower()
     proj_file = root / "笔记" / "进行中的项目.md"
@@ -142,20 +161,28 @@ def kb_project_context_data(cwd_or_project: str, root: Path = DEFAULT_KB_ROOT) -
             if sec.startswith("### ") and key in sec.lower():
                 matched_sections.append(sec.strip())
 
-    recent_res = _fts_via_sys_python(root, key or cwd_or_project, "all", "all", key, "", 4, 1) if key else []
-    if not recent_res and key:
-        recent_res = kb_search_data(key, mode="hybrid", limit=4, per_conv=1, root=root).get("results", [])
+    recent_res: list[dict] = []
+    if key and (include_recent or not matched_sections):
+        recent_res = _fts_via_sys_python(root, key or cwd_or_project, "all", "all", key, "", 4, 1)
+        if not recent_res:
+            recent_res = kb_search_data(key, mode="hybrid", limit=4, per_conv=1, root=root).get("results", [])
 
-    return {
+    payload: dict = {
         "query": cwd_or_project,
         "matched_key": key,
         "git_status_rows": git_rows,
         "project_sections": matched_sections,
-        "recent_hits": recent_res[:4],
     }
+    if recent_res:
+        payload["recent_hits"] = _trim_hits(recent_res[:4])
+    return payload
 
 
-def kb_mistakes_data(include_pending: bool = True, root: Path = DEFAULT_KB_ROOT) -> dict:
+def kb_mistakes_data(
+    include_pending: bool = False,
+    full_book: bool = False,
+    root: Path = DEFAULT_KB_ROOT,
+) -> dict:
     root = root.resolve()
     book = root / "笔记" / "AI协作错题本.md"
     qfile = root / "_同步" / "retrospect-queue.json"
@@ -165,14 +192,15 @@ def kb_mistakes_data(include_pending: bool = True, root: Path = DEFAULT_KB_ROOT)
             pending = json.loads(qfile.read_text(encoding="utf-8")).get("candidates", [])
         except Exception:
             pending = []
-    return {
-        "guardrails": kb_retrospect.extract_top_guardrails(root),
-        "mistake_book": book.read_text(encoding="utf-8", errors="replace") if book.is_file() else "",
-        "pending_candidates": pending if include_pending else [],
-    }
+    payload: dict = {"guardrails": kb_retrospect.extract_top_guardrails(root)}
+    if full_book and book.is_file():
+        payload["mistake_book"] = book.read_text(encoding="utf-8", errors="replace")
+    if include_pending:
+        payload["pending_candidates"] = pending
+    return payload
 
 
-def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 160, root: Path = DEFAULT_KB_ROOT) -> dict:
+def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 100, root: Path = DEFAULT_KB_ROOT) -> dict:
     root = root.resolve()
     raw = (rel_path or "").strip().lstrip("/")
     target = (root / raw).resolve()
@@ -198,7 +226,7 @@ def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 160, 
 @mcp.tool()
 def kb_overview() -> str:
     """Return INDEX.md routing map, latest KB doctor health/staleness snapshot, and Top 8 mistake guardrails."""
-    return json.dumps(kb_overview_data(), ensure_ascii=False, indent=2)
+    return _compact_json(kb_overview_data())
 
 
 @mcp.tool()
@@ -209,31 +237,31 @@ def kb_search_query(
     role: str = "all",
     cwd: str = "",
     since: str = "",
-    limit: int = 8,
+    limit: int = 5,
 ) -> str:
     """Search the local 5-source Agent Memory KB using Hybrid ONNX Semantic Vector + SQLite FTS5 BM25 fusion."""
-    return json.dumps(
-        kb_search_data(query=query, mode=mode, source=source, role=role, cwd=cwd, since=since, limit=limit),
-        ensure_ascii=False, indent=2,
+    return _compact_json(
+        kb_search_data(query=query, mode=mode, source=source, role=role, cwd=cwd, since=since, limit=limit)
     )
 
 
 @mcp.tool()
-def kb_project_context(cwd_or_project: str) -> str:
-    """Return active project breakpoints, Git status snapshot, and recent archived turns for a workspace or repo name."""
-    return json.dumps(kb_project_context_data(cwd_or_project), ensure_ascii=False, indent=2)
+def kb_project_context(cwd_or_project: str, include_recent: bool = False) -> str:
+    """Return active project breakpoints, Git status snapshot, and optional recent archived turns for a workspace or repo name."""
+    return _compact_json(kb_project_context_data(cwd_or_project, include_recent=include_recent))
 
 
 @mcp.tool()
-def kb_mistakes_and_guardrails(include_pending: bool = True) -> str:
-    """Return the cross-agent AI mistake book guardrails, merged patterns, and pending high-friction queue."""
-    return json.dumps(kb_mistakes_data(include_pending=include_pending), ensure_ascii=False, indent=2)
+def kb_mistakes_and_guardrails(include_pending: bool = False, full_book: bool = False) -> str:
+    """Return concise top AI mistake-book guardrails by default; set full_book=True or include_pending=True when doing retrospect."""
+    return _compact_json(kb_mistakes_data(include_pending=include_pending, full_book=full_book))
 
 
 @mcp.tool()
-def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 160) -> str:
-    """Read a line-bounded slice of any Markdown/JSON file strictly inside the KB root."""
-    return json.dumps(kb_read_note_data(rel_path=rel_path, start_line=start_line, max_lines=max_lines), ensure_ascii=False, indent=2)
+def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 100) -> str:
+    """Read a line-bounded plain-text slice of any Markdown/JSON file strictly inside the KB root."""
+    d = kb_read_note_data(rel_path=rel_path, start_line=start_line, max_lines=max_lines)
+    return f"# {d['path']} (lines {d['start_line']}-{d['end_line']}/{d['total_lines']})\n{d['content']}"
 
 
 if __name__ == "__main__":
