@@ -91,6 +91,10 @@ def kb_overview_data(root: Path = DEFAULT_KB_ROOT) -> dict:
         "index_md": index_path.read_text(encoding="utf-8", errors="replace") if index_path.is_file() else "",
         "guardrails": kb_retrospect.extract_top_guardrails(root),
         "health_summary": health_lines,
+        "next_hop_hint": (
+            "Hop 2: Call kb_project_context(cwd_or_project) for active repo breakpoints & recent turns, "
+            "kb_mistakes_and_guardrails() for full mistake patterns, or kb_search_query(query) for historical quotes."
+        ),
     }
 
 
@@ -184,6 +188,10 @@ def kb_project_context_data(
     }
     if recent_res:
         payload["recent_hits"] = _trim_hits(recent_res[:4])
+    payload["next_hop_hint"] = (
+        "Call kb_read_note(rel_path, start_line, max_lines) to inspect any matched note or conversation in full, "
+        "or kb_search_query(query) to search deeper across all 5 archived AI sources."
+    )
     return payload
 
 
@@ -234,7 +242,8 @@ def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 160, 
 
 @mcp.tool()
 def kb_overview() -> str:
-    """Return INDEX.md routing map, latest KB doctor health/staleness snapshot, and Top 8 mistake guardrails."""
+    """WHEN TO USE: Call first at the start of a task to load the progressive-disclosure routing map (INDEX.md), Top guardrails, and KB health status.
+    RETURNS: Compact JSON with index_md, guardrails, health_summary, and next_hop_hint."""
     return _compact_json(kb_overview_data())
 
 
@@ -248,7 +257,9 @@ def kb_search_query(
     since: str = "",
     limit: int = 8,
 ) -> str:
-    """Search the local 5-source Agent Memory KB using Hybrid ONNX Semantic Vector + SQLite FTS5 BM25 fusion."""
+    """WHEN TO USE: Call when you need historical decisions, exact user quotes, API contracts, or past bug-fix discussions across all 5 archived AI tools (Codex, Cursor, Claude Code, Antigravity, ChatGPT) and curated notes.
+    ARGS: query (keywords or natural-language question), mode ('hybrid' RRF default, 'fts' for exact tokens/regex, 'vector' for semantic), source ('all'|'notes'|'codex'|'cursor'|'antigravity'|'claude'|'chatgpt'), limit (default 8).
+    RETURNS: Ranked hits with relative path, line number, updated_at date, and grounded snippet (follow up with kb_read_note(path, start_line) for full context)."""
     return _compact_json(
         kb_search_data(query=query, mode=mode, source=source, role=role, cwd=cwd, since=since, limit=limit)
     )
@@ -256,19 +267,23 @@ def kb_search_query(
 
 @mcp.tool()
 def kb_project_context(cwd_or_project: str, include_recent: bool = True) -> str:
-    """Return active project breakpoints, Git status snapshot, and recent archived turns for a workspace or repo name."""
+    """WHEN TO USE: Call when starting or resuming work on a specific repository or project (pass the workspace directory name or project slug, e.g. 'employee-web-wx', 'salary-web-pc', 'xtolls').
+    RETURNS: Live Git branch/dirty probe rows, curated project breakpoints (confirmed contracts, verification boundaries, next steps), and top 4 recent archived conversation hits for that project."""
     return _compact_json(kb_project_context_data(cwd_or_project, include_recent=include_recent))
 
 
 @mcp.tool()
 def kb_mistakes_and_guardrails(include_pending: bool = True, full_book: bool = True) -> str:
-    """Return the cross-agent AI mistake book guardrails, merged patterns, and pending high-friction queue."""
+    """WHEN TO USE: Call before multi-file edits, UI/DOM/style changes, or external publishing, or when reviewing recurring AI collaboration mistakes.
+    RETURNS: Top guardrails, the complete mistake book with [复发 xN] root-cause patterns, and any pending high-friction sessions awaiting retrospect."""
     return _compact_json(kb_mistakes_data(include_pending=include_pending, full_book=full_book))
 
 
 @mcp.tool()
 def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 160) -> str:
-    """Read a line-bounded plain-text slice of any Markdown/JSON file strictly inside the KB root."""
+    """WHEN TO USE: Call to read a specific living note (e.g. '笔记/进行中的项目.md', '笔记/财富与投资纪律.md') or an archived conversation file returned by kb_search_query.
+    ARGS: rel_path (path relative to KB root), start_line (1-based), max_lines (default 160, max 400).
+    RETURNS: Line-numbered plain text strictly confined inside the KB root."""
     d = kb_read_note_data(rel_path=rel_path, start_line=start_line, max_lines=max_lines)
     return f"# {d['path']} (lines {d['start_line']}-{d['end_line']}/{d['total_lines']})\n{d['content']}"
 
