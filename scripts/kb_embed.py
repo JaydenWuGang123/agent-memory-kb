@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
 """Incremental local ONNX Transformer vector indexer & semantic search engine.
 
 Uses the cached multilingual bi-encoder (paraphrase-multilingual-MiniLM-L12-v2, dim=384)

@@ -178,7 +178,7 @@ def main():
     (output / "对话" / "Claude").mkdir(parents=True, exist_ok=True)
     (output / "_同步").mkdir(parents=True, exist_ok=True)
     manifest_path = output / "_同步" / "claude-manifest.json"
-    previous = {x["id"]: x for x in json.loads(manifest_path.read_text())} if manifest_path.exists() else {}
+    previous = {x["id"]: x for x in json.loads(manifest_path.read_text(encoding="utf-8"))} if manifest_path.exists() else {}
 
     synced_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     noise_cfg = load_noise_filter(output)

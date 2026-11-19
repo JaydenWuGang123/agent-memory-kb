@@ -98,7 +98,7 @@ def init_kb(target_root: Path, force: bool = False, profile: str = "dev") -> dic
         dst.parent.mkdir(parents=True, exist_ok=True)
         if force or not dst.exists():
             shutil.copy2(src, dst)
-            created_templates.append(str(dst.relative_to(target_root)))
+            created_templates.append(dst.relative_to(target_root).as_posix())
 
     # Apply general (non-developer) living-note templates when requested
     if profile == "general":

@@ -78,8 +78,14 @@ def verify_icloud_mirror(
                 _ = target.stat()
             except PermissionError as exc:
                 return {"status": "tcc_permission_denied", "ok": False, "path": str(target), "error": str(exc)}
+            import shutil
+            openssl_bin = shutil.which("openssl") or (
+                r"C:\Program Files\Git\usr\bin\openssl.exe"
+                if Path(r"C:\Program Files\Git\usr\bin\openssl.exe").is_file()
+                else "openssl"
+            )
             dres = subprocess.run(
-                ["openssl", "enc", "-d", "-aes-256-cbc", "-pbkdf2", "-in", str(target), "-out", str(decrypted), "-pass", "stdin"],
+                [openssl_bin, "enc", "-d", "-aes-256-cbc", "-pbkdf2", "-in", str(target), "-out", str(decrypted), "-pass", "stdin"],
                 input=pw + "\n", text=True, capture_output=True, check=False,
             )
             if dres.returncode != 0 or not decrypted.is_file():

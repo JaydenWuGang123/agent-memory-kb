@@ -90,7 +90,7 @@ def scan_correction_candidates(
             "resolved": resolved,
         }
 
-    conn = sqlite3.connect(f"file:{sqlite_file}?mode=ro", uri=True)
+    conn = sqlite3.connect(sqlite_file.resolve().as_uri() + "?mode=ro", uri=True)
     try:
         sql = (
             "SELECT f.id, f.source, f.path, f.title, f.updated_at, d.body "

@@ -15,12 +15,13 @@ from pathlib import Path
 import re
 import sqlite3
 import subprocess
+import sys
 
 ARCHIVE_SOURCES = ("codex", "chatgpt", "cursor", "antigravity", "claude")
 REGEX_META_RE = re.compile(r"[|*?+()\[\]{}\\]")
 SCHEMA_VERSION = "3"
 SYNC_DIR = Path(__file__).resolve().parent
-VEC_PYTHON = Path("/usr/local/bin/python3")
+VEC_PYTHON = Path("/usr/local/bin/python3") if Path("/usr/local/bin/python3").is_file() else Path(sys.executable)
 
 
 def cjk_tokenize(text: str) -> str:
@@ -69,7 +70,7 @@ def parse_curated_chunks(md_path: Path, root: Path) -> list[dict]:
     cur_heading = md_path.stem
     cur_line = 1
     buf: list[str] = []
-    rel = str(md_path.relative_to(root))
+    rel = md_path.relative_to(root).as_posix()
 
     def flush():
         body = "\n".join(buf).strip()
@@ -103,7 +104,7 @@ def parse_curated_chunks(md_path: Path, root: Path) -> list[dict]:
 
 def parse_conversation_messages(md_path: Path, root: Path, meta: dict) -> list[dict]:
     lines = md_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    rel = str(md_path.relative_to(root))
+    rel = md_path.relative_to(root).as_posix()
     chunks = []
     cur_header = "文件头部"
     cur_role = "meta"
@@ -176,7 +177,7 @@ def _collect_all_targets(root: Path) -> dict[str, tuple[str, Path, dict | None]]
             curated_files.extend(sorted(d.glob("*.md")))
     for f in curated_files:
         if f.is_file():
-            rel = str(f.relative_to(root))
+            rel = f.relative_to(root).as_posix()
             targets[rel] = ("curated", f, None)
 
     for meta in load_manifests(root):
@@ -198,7 +199,7 @@ def _collect_all_targets(root: Path) -> dict[str, tuple[str, Path, dict | None]]
         if not sdir.is_dir():
             continue
         for md_path in sorted(sdir.glob("*.md")):
-            rel = str(md_path.relative_to(root))
+            rel = md_path.relative_to(root).as_posix()
             if rel not in targets:
                 targets[rel] = ("archive", md_path, {"source": src_name, "title": md_path.stem, "cwd": "", "updated_at": ""})
     return targets
@@ -718,7 +719,7 @@ def _query_vectors_subprocess(
         "--per-conv", str(per_conv),
     ]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=20, check=False)
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False)
         if res.returncode != 0 or not res.stdout.strip():
             return []
         return json.loads(res.stdout).get("results", [])
@@ -939,7 +940,7 @@ def main():
 
     print(f"# 知识库检索结果：`{args.query}`（返回前 {len(results)} 条，按最新时间优先）\n")
     for idx, r in enumerate(results, 1):
-        link = f"[{r['path']}#L{r['line']}](file://{r['abs_path']}#L{r['line']})"
+        link = f"[{r['path']}#L{r['line']}]({Path(r['abs_path']).resolve().as_uri()}#L{r['line']})"
         if r["tier"] == "curated":
             print(f"{idx}. **[精炼活页/档案]** {link} · 章节：`{r['section']}`")
         else:

@@ -4,13 +4,21 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import fcntl
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows lacks fcntl
+    fcntl = None  # type: ignore[assignment]
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None  # type: ignore[assignment]
 import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from zoneinfo import ZoneInfo
 
@@ -69,12 +77,26 @@ def sync_lock(root: Path):
     sync_dir = root / '_同步'
     sync_dir.mkdir(parents=True, exist_ok=True)
     lock_path = sync_dir / '.kb-sync.lock'
-    with lock_path.open('w', encoding='utf-8') as f:
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-        try:
+    with lock_path.open('a+', encoding='utf-8') as f:
+        if fcntl is not None:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        elif msvcrt is not None:  # pragma: no cover - Windows file locking
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                f.seek(0)
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+        else:  # pragma: no cover
             yield
-        finally:
-            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def ensure_pre_commit_hook(root: Path):
@@ -86,11 +108,16 @@ def ensure_pre_commit_hook(root: Path):
         "#!/bin/sh\n"
         "set -e\n"
         "REPO_ROOT=\"$(git rev-parse --show-toplevel)\"\n"
-        "python3 \"$REPO_ROOT/_同步/kb_doctor.py\" --root \"$REPO_ROOT\" --ignore-budget --skip-external-checks >/dev/null\n"
+        "PY=python3\n"
+        "command -v python3 >/dev/null 2>&1 || PY=python\n"
+        "\"$PY\" \"$REPO_ROOT/_同步/kb_doctor.py\" --root \"$REPO_ROOT\" --ignore-budget --skip-external-checks >/dev/null\n"
     )
     if not hook_path.is_file() or hook_path.read_text(encoding='utf-8', errors='replace') != hook_body:
         hook_path.write_text(hook_body, encoding='utf-8')
-        hook_path.chmod(0o755)
+        try:
+            hook_path.chmod(0o755)
+        except OSError:
+            pass
 
 
 def maybe_git_gc(root: Path, threshold: int) -> bool:
@@ -104,6 +131,11 @@ def maybe_git_gc(root: Path, threshold: int) -> bool:
 
 def _get_keychain_passphrase(service: str) -> str | None:
     if os.environ.get('PERSONAL_KB_SKIP_KEYCHAIN') == '1':
+        return None
+    env_pw = (os.environ.get('AGENT_MEMORY_KB_ENC_PASS') or '').strip()
+    if env_pw:
+        return env_pw
+    if sys.platform != 'darwin':
         return None
     try:
         res = subprocess.run(
@@ -153,9 +185,21 @@ def _safe_unlink(path: Path) -> None:
         pass
 
 
+def _find_openssl() -> str:
+    found = shutil.which('openssl')
+    if found:
+        return found
+    git_openssl = Path(r'C:\Program Files\Git\usr\bin\openssl.exe')
+    if git_openssl.is_file():
+        return str(git_openssl)
+    return 'openssl'
+
+
 def sync_icloud_mirror(root: Path, bundle_path: Path, icloud_path: Path | None, passphrase_override: str | None = None) -> tuple[bool, str | None, bool]:
     """Copy or AES-256 encrypt local bundle to iCloud Drive, verifying decrypt round-trip before commit."""
     if icloud_path is None:
+        return False, None, False
+    if sys.platform != 'darwin' and icloud_path == DEFAULT_ICLOUD_BUNDLE_PATH:
         return False, None, False
     passphrase = passphrase_override if passphrase_override is not None else _get_keychain_passphrase(KEYCHAIN_ENC_SERVICE)
     encrypted = bool(passphrase)
@@ -164,8 +208,9 @@ def sync_icloud_mirror(root: Path, bundle_path: Path, icloud_path: Path | None, 
     try:
         target_icloud.parent.mkdir(parents=True, exist_ok=True)
         if encrypted:
+            openssl_bin = _find_openssl()
             enc_res = subprocess.run(
-                ['openssl', 'enc', '-aes-256-cbc', '-pbkdf2', '-salt', '-in', str(bundle_path), '-out', str(tmp_icloud), '-pass', 'stdin'],
+                [openssl_bin, 'enc', '-aes-256-cbc', '-pbkdf2', '-salt', '-in', str(bundle_path), '-out', str(tmp_icloud), '-pass', 'stdin'],
                 input=passphrase + '\n', text=True, capture_output=True, check=False
             )
             if enc_res.returncode != 0:
@@ -173,7 +218,7 @@ def sync_icloud_mirror(root: Path, bundle_path: Path, icloud_path: Path | None, 
             with tempfile.TemporaryDirectory() as td:
                 dec_check = Path(td) / 'verify.bundle'
                 dec_res = subprocess.run(
-                    ['openssl', 'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-in', str(tmp_icloud), '-out', str(dec_check), '-pass', 'stdin'],
+                    [openssl_bin, 'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-in', str(tmp_icloud), '-out', str(dec_check), '-pass', 'stdin'],
                     input=passphrase + '\n', text=True, capture_output=True, check=False
                 )
                 if dec_res.returncode != 0 or not dec_check.is_file():
@@ -292,7 +337,7 @@ def maybe_push_private_remote(root: Path, remote_name: str | None) -> tuple[bool
 
 
 def maybe_notify_issues(cfg: dict, state: dict, icloud_alert_state: str, icloud_note: str | None, exporter_errors: list, doctor_res: dict, bundle_verified: bool, skip_notify: bool) -> None:
-    if skip_notify or not cfg.get('macos_notify_on_error', True):
+    if skip_notify or sys.platform != 'darwin' or not cfg.get('macos_notify_on_error', True):
         return
     issues: list[tuple[str, str]] = []
     if exporter_errors:

@@ -22,7 +22,7 @@ PUBLIC_SCAN_EXTS = {".md", ".txt", ".json", ".html", ".htm", ".yml", ".yaml", ".
 
 SENSITIVE_PATTERNS = [
     ("内网或私有 IP", r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})\b"),
-    ("本机绝对路径 (/Users/... 或 /home/...)", r"/(?:Users|home)/[A-Za-z0-9_.\u4e00-\u9fff-]+/"),
+    ("本机绝对路径 (/Users/... 或 C:\\Users\\...)", r"(?:/(?:Users|home)/|[A-Za-z]:\\Users\\)[A-Za-z0-9_.\u4e00-\u9fff-]+[\\/]"),
     ("疑似密钥或 Token", r"\b(?:ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})\b"),
     ("个人手机号", r"\b1[3-9]\d{9}\b"),
 ]
@@ -78,7 +78,10 @@ def check_links(root: Path, skip_external_links: bool = False) -> list[dict]:
                 if not clean_target:
                     continue
                 if clean_target.startswith("file://"):
-                    resolved = Path(clean_target.replace("file://", "")).resolve()
+                    fp = clean_target.replace("file://", "")
+                    if re.match(r"^/[A-Za-z]:/", fp):
+                        fp = fp[1:]
+                    resolved = Path(fp).resolve()
                 else:
                     resolved = (md.parent / clean_target).resolve()
                 if skip_external_links:
@@ -88,7 +91,7 @@ def check_links(root: Path, skip_external_links: bool = False) -> list[dict]:
                         continue
                 if not resolved.exists():
                     broken.append({
-                        "file": str(md.relative_to(root)),
+                        "file": md.relative_to(root).as_posix(),
                         "line": idx,
                         "target": target_raw,
                     })
@@ -180,7 +183,7 @@ def check_config_integrity(root: Path) -> list[str]:
         try:
             json.loads(p.read_text(encoding="utf-8"))
         except Exception as exc:
-            errors.append(f"{p.relative_to(root)}: JSON 解析失败 ({exc})")
+            errors.append(f"{p.relative_to(root).as_posix()}: JSON 解析失败 ({exc})")
     return errors
 
 
@@ -199,7 +202,7 @@ def check_archive_secrets(root: Path) -> list[dict]:
         matched_rules = find_raw_secrets(text)
         if matched_rules:
             leaks.append({
-                "file": str(p.relative_to(root)),
+                "file": p.relative_to(root).as_posix(),
                 "rules": matched_rules,
             })
     return leaks

@@ -30,7 +30,7 @@ def json_value(value):
 
 def ingest(input_path, data_dir: Path = DATA):
     """Save an immutable API snapshot before merging, never replace old pages."""
-    data = json.loads(Path(input_path).read_text())
+    data = json.loads(Path(input_path).read_text(encoding='utf-8'))
     if 'thread' not in data and isinstance(data.get('content'), list):
         data = json.loads(next(block['text'] for block in data['content'] if block.get('type') == 'text'))
     thread = data.get('thread', {})
@@ -93,7 +93,7 @@ def render_all(kb_root: Path = KB):
         if not folder.is_dir():
             continue
         raw_paths = sorted([*folder.glob('page-*.json'), *folder.glob('snapshot-*.json')], key=lambda p: (p.stat().st_mtime_ns, p.name))
-        pages = [json.loads(p.read_text()) for p in raw_paths]
+        pages = [json.loads(p.read_text(encoding='utf-8')) for p in raw_paths]
         if not pages:
             continue
         info = next((p['thread'] for p in reversed(pages) if p.get('thread')), {})

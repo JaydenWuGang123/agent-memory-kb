@@ -204,7 +204,7 @@ def main():
     (output / "对话" / "Codex").mkdir(parents=True, exist_ok=True)
     (output / "_同步").mkdir(parents=True, exist_ok=True)
     manifest_path = output / "_同步" / "codex-manifest.json"
-    previous = {x["id"]: x for x in json.loads(manifest_path.read_text())} if manifest_path.exists() else {}
+    previous = {x["id"]: x for x in json.loads(manifest_path.read_text(encoding="utf-8"))} if manifest_path.exists() else {}
     state = connect(args.codex_home / "state_5.sqlite")
     history = connect(args.codex_home / "thread_history_1.sqlite")
     cols = {r[1] for r in state.execute("PRAGMA table_info(threads)").fetchall()}

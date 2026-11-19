@@ -147,7 +147,7 @@ def run_sub_exporters(root: Path, include_codex: bool = False) -> list[dict]:
         try:
             res = subprocess.run(
                 [sys.executable, str(script_path), '--output-root', str(root)],
-                capture_output=True, text=True, timeout=180, check=False
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180, check=False
             )
             if res.returncode != 0:
                 detail = (res.stderr or res.stdout or f'exit code {res.returncode}').strip()
@@ -179,7 +179,7 @@ def sync_vectors_subprocess(root: Path, skip: bool = False) -> dict:
     try:
         res = subprocess.run(
             [str(VEC_PYTHON), str(embed_script), '--root', str(root), '--sync'],
-            capture_output=True, text=True, timeout=120, check=False,
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120, check=False,
         )
         if res.returncode == 0 and res.stdout.strip():
             return json.loads(res.stdout.strip())
@@ -391,7 +391,7 @@ def run_pipeline(args) -> dict:
     auto_archive_res = auto_archive_profile_if_needed(root, int(cfg.get('profile_auto_archive_lines', 260)))
 
     sig_path = root / '_同步' / 'index-state-signature.json'
-    prev_sig_data = json.loads(sig_path.read_text()) if sig_path.is_file() else {}
+    prev_sig_data = json.loads(sig_path.read_text(encoding='utf-8')) if sig_path.is_file() else {}
 
     if args.skip_repo_probe:
         repo_sig = prev_sig_data.get('repos_sig', [])
@@ -404,7 +404,7 @@ def run_pipeline(args) -> dict:
     for source in ['codex', 'chatgpt', 'cursor', 'antigravity', 'claude']:
         manifest = root / '_同步' / f'{source}-manifest.json'
         if manifest.exists():
-            records.extend(json.loads(manifest.read_text()))
+            records.extend(json.loads(manifest.read_text(encoding='utf-8')))
     records.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
 
     groups = defaultdict(list)
@@ -421,7 +421,7 @@ def run_pipeline(args) -> dict:
     claude = [x for x in records if x['source'] == 'claude']
 
     discovered_path = root / '_同步' / 'chatgpt-discovered.json'
-    discovered = json.loads(discovered_path.read_text()) if discovered_path.exists() else []
+    discovered = json.loads(discovered_path.read_text(encoding='utf-8')) if discovered_path.exists() else []
     readable_ids = {x['id'] for x in chatgpt}
     raw_chatgpt_dir = root / '_同步' / 'chatgpt-raw'
     pending = [
@@ -445,7 +445,7 @@ def run_pipeline(args) -> dict:
         sub_dir = root / sub
         if sub_dir.is_dir():
             for p in sorted(sub_dir.glob('*.md')):
-                notes_hashes.append((str(p.relative_to(root)), hashlib.sha256(p.read_bytes()).hexdigest()))
+                notes_hashes.append((p.relative_to(root).as_posix(), hashlib.sha256(p.read_bytes()).hexdigest()))
     for top_file in ['个人档案.md', 'INDEX.md', '同步规则.md', '跨设备配置.md', '_同步/kb_config.json']:
         p = root / top_file
         if p.is_file():

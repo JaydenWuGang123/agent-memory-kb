@@ -8,9 +8,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.12"]
 
     steps:
@@ -30,12 +32,17 @@ jobs:
       - name: Run unit tests
         env:
           PERSONAL_KB_SKIP_KEYCHAIN: "1"
+          PYTHONUTF8: "1"
         run: |
-          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+          python -m unittest discover -s scripts -p "test_*.py" -v
 
-      - name: End-to-end init and doctor verification
+      - name: End-to-end init and doctor verification (dev & general profiles)
         env:
           PERSONAL_KB_SKIP_KEYCHAIN: "1"
+          PYTHONUTF8: "1"
+        shell: bash
         run: |
-          python3 init_kb.py --root /tmp/test-agent-memory-kb
-          python3 /tmp/test-agent-memory-kb/_同步/kb_doctor.py --root /tmp/test-agent-memory-kb --skip-external-checks
+          python init_kb.py --root ./tmp-ci-dev-kb --profile dev
+          python ./tmp-ci-dev-kb/_同步/kb_doctor.py --root ./tmp-ci-dev-kb --skip-external-checks
+          python init_kb.py --root ./tmp-ci-general-kb --profile general
+          python ./tmp-ci-general-kb/_同步/kb_doctor.py --root ./tmp-ci-general-kb --skip-external-checks

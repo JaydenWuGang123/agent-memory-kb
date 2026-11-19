@@ -35,7 +35,7 @@ import kb_embed  # noqa: E402
 import kb_retrospect  # noqa: E402
 import kb_search  # noqa: E402
 
-SYS_PYTHON = "/usr/bin/python3"
+SYS_PYTHON = "/usr/bin/python3" if Path("/usr/bin/python3").is_file() else sys.executable
 _EMBEDDER: kb_embed.LocalOnnxEmbedder | None = None
 
 mcp = FastMCP("personal-kb")
@@ -78,7 +78,7 @@ def _fts_via_sys_python(
         "--mode", "fts",
         "--json",
     ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=20, check=False)
+    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False)
     if res.returncode != 0 or not res.stdout.strip():
         return []
     return json.loads(res.stdout).get("results", [])
@@ -182,7 +182,8 @@ def kb_project_context_data(
     include_recent: bool = True,
 ) -> dict:
     root = root.resolve()
-    key = Path(cwd_or_project).name.lower() if "/" in cwd_or_project else cwd_or_project.strip().lower()
+    norm_cwd = (cwd_or_project or "").replace("\\", "/").rstrip("/")
+    key = norm_cwd.rsplit("/", 1)[-1].lower() if "/" in norm_cwd else norm_cwd.strip().lower()
     syn_map = kb_search.load_synonyms(root)
     key_variants = list(dict.fromkeys([key] + [v.lower() for v in kb_search.expand_term_variants(key, syn_map)])) if key else []
     proj_file = root / "笔记" / "进行中的项目.md"
@@ -219,8 +220,9 @@ def kb_project_context_data(
         # Rule A: If conversation has a specific repo cwd, it must not conflict with the queried project
         h_cwd = (h.get("cwd") or "").strip()
         if h_cwd and not title_matches_key:
-            cwd_slug = Path(h_cwd).name.lower()
-            if cwd_slug not in ("", "wugang", "工作", "个人") and not any(kv in h_cwd.lower() for kv in key_variants):
+            h_cwd_norm = h_cwd.replace("\\", "/").rstrip("/")
+            cwd_slug = h_cwd_norm.rsplit("/", 1)[-1].lower() if "/" in h_cwd_norm else h_cwd_norm.lower()
+            if cwd_slug not in ("", "wugang", "工作", "个人") and not any(kv in h_cwd_norm.lower() for kv in key_variants):
                 return False
         # Rule B: Exclude cross-project overview/inventory dumps that list many unrelated projects
         if not title_matches_key:
@@ -312,10 +314,10 @@ def kb_read_note_data(
     root: Path = DEFAULT_KB_ROOT,
 ) -> dict:
     root = root.resolve()
-    raw = (rel_path or "").strip().lstrip("/")
+    raw = (rel_path or "").replace("\\", "/").strip().lstrip("/")
     target = (root / raw).resolve()
     try:
-        rel_clean = target.relative_to(root)
+        rel_clean = target.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError(f"Access denied: path outside KB root ({rel_path})") from exc
     if not target.is_file():

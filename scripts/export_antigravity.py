@@ -33,9 +33,14 @@ def extract_user_text(raw: str) -> str:
 
 
 def extract_cwd(raw: str) -> str:
-    m = re.search(r"Active Document:\s*(/[^\s(]+)", raw)
+    m = re.search(r"Active Document:\s*((?:/|[A-Za-z]:[\\/])[^\s(]+)", raw)
     if m:
         p = m.group(1)
+        if re.match(r"^[A-Za-z]:[\\/]", p):
+            parts = [x for x in re.split(r"[\\/]", p) if x]
+            if len(parts) >= 4 and parts[1].lower() == "users":
+                return "/".join(parts[:4])
+            return p.replace("\\", "/")
         parts = p.split("/")
         if len(parts) >= 4 and parts[1] == "Users":
             return "/".join(parts[:4])
@@ -180,7 +185,7 @@ def main():
     (output / "对话" / "Antigravity").mkdir(parents=True, exist_ok=True)
     (output / "_同步").mkdir(parents=True, exist_ok=True)
     manifest_path = output / "_同步" / "antigravity-manifest.json"
-    previous = {x["id"]: x for x in json.loads(manifest_path.read_text())} if manifest_path.exists() else {}
+    previous = {x["id"]: x for x in json.loads(manifest_path.read_text(encoding="utf-8"))} if manifest_path.exists() else {}
 
     synced_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     noise_cfg = load_noise_filter(output)

@@ -11,6 +11,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sqlite3
@@ -64,6 +65,8 @@ def load_workspace_mapping(ws_root: Path) -> dict[str, str]:
             try:
                 folder_uri = json.loads(wjson.read_text(encoding="utf-8", errors="replace")).get("folder", "")
                 cwd = unquote(folder_uri.replace("file://", "")) if folder_uri.startswith("file://") else folder_uri
+                if re.match(r"^/[A-Za-z]:/", cwd):
+                    cwd = cwd[1:]
                 conn = connect_ro(vdb)
                 row = conn.execute("SELECT value FROM ItemTable WHERE key = 'composer.composerData'").fetchone()
                 conn.close()
@@ -112,12 +115,20 @@ def render(conv, synced_at: str) -> str:
     return "\n".join(lines)
 
 
+def _default_cursor_user_dir() -> Path:
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / "Cursor" / "User"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Cursor" / "User"
+    return Path.home() / ".config" / "Cursor" / "User"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--cursor-user-dir",
         type=Path,
-        default=Path.home() / "Library" / "Application Support" / "Cursor" / "User",
+        default=_default_cursor_user_dir(),
     )
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--force", action="store_true")
@@ -129,7 +140,7 @@ def main():
     (output / "对话" / "Cursor").mkdir(parents=True, exist_ok=True)
     (output / "_同步").mkdir(parents=True, exist_ok=True)
     manifest_path = output / "_同步" / "cursor-manifest.json"
-    previous = {x["id"]: x for x in json.loads(manifest_path.read_text())} if manifest_path.exists() else {}
+    previous = {x["id"]: x for x in json.loads(manifest_path.read_text(encoding="utf-8"))} if manifest_path.exists() else {}
 
     if not global_db.is_file():
         print(json.dumps({"written": 0, "unchanged": 0, "manifest_entries": len(previous), "message_count": 0}))

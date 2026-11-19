@@ -748,23 +748,24 @@ class TestHybridSearchAndMcp(unittest.TestCase):
             self.assertEqual(fused[0]["path"], "b.md")
             self.assertEqual(fused[0]["match_via"], "fts+vector")
 
-            # Verify MCP server read tools, section jump & path traversal guard using Python 3.11 runtime
+            # Verify MCP server read tools, Windows path parsing, section jump & path traversal guard
             py311 = Path("/usr/local/bin/python3")
-            if py311.is_file():
-                script = (
-                    "import json, sys; from pathlib import Path; "
-                    f"sys.path.insert(0, {str(SYNC_DIR)!r}); import kb_mcp; "
-                    f"r = Path({str(root)!r}); "
-                    "ov = kb_mcp.kb_overview_data(r); assert ov['guardrails'] == ['1. 先读原文。']; "
-                    "ctx = kb_mcp.kb_project_context_data('/Users/dev/chat-app', r); assert len(ctx['project_sections']) == 1; "
-                    "rd = kb_mcp.kb_read_note_data('个人档案.md', section='前端实现约定', root=r); assert rd['start_line'] == 3; "
-                    "ok_block = False\n"
-                    "try:\n kb_mcp.kb_read_note_data('../../etc/passwd', root=r)\n"
-                    "except ValueError:\n ok_block = True\n"
-                    "assert ok_block; print('MCP_OK')"
-                )
-                out = subprocess.run([str(py311), "-c", script], capture_output=True, text=True, check=True)
-                self.assertIn("MCP_OK", out.stdout)
+            mcp_py = str(py311) if py311.is_file() else sys.executable
+            script = (
+                "import json, sys; from pathlib import Path; "
+                f"sys.path.insert(0, {str(SYNC_DIR)!r}); import kb_mcp; "
+                f"r = Path({str(root)!r}); "
+                "ov = kb_mcp.kb_overview_data(r); assert ov['guardrails'] == ['1. 先读原文。']; "
+                "ctx = kb_mcp.kb_project_context_data('/Users/dev/chat-app', r); assert len(ctx['project_sections']) == 1; "
+                "ctx_win = kb_mcp.kb_project_context_data(r'C:\\Users\\dev\\chat-app', r); assert len(ctx_win['project_sections']) == 1; "
+                "rd = kb_mcp.kb_read_note_data('个人档案.md', section='前端实现约定', root=r); assert rd['start_line'] == 3; "
+                "ok_block = False\n"
+                "try:\n kb_mcp.kb_read_note_data('../../etc/passwd', root=r)\n"
+                "except ValueError:\n ok_block = True\n"
+                "assert ok_block; print('MCP_OK')"
+            )
+            out = subprocess.run([mcp_py, "-c", script], capture_output=True, text=True, encoding="utf-8", check=True)
+            self.assertIn("MCP_OK", out.stdout)
 
 
 class TestIcloudMirrorResilience(unittest.TestCase):
