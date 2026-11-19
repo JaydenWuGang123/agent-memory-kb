@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import sqlite3
 import sys
 
@@ -23,15 +24,26 @@ from kb_filters import atomic_write_text, clean_ide_prompt, load_noise_filter, r
 
 VERSION = 3
 VISIBLE_PHASES = {None, "commentary", "final", "final_answer"}
+_TRIVIAL_TITLE_RE = re.compile(r"^(?:你好|您好|hi|hello|继续|已连接|你是什么模型|你有多少额度|测试一下你现在有没有啥问题)[!！?？。.,，\s]*$", re.I)
+
+
+def _norm_title_cand(raw: str) -> str:
+    txt = clean_ide_prompt(raw or "").replace("\n", " ").strip()
+    txt = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", txt)
+    return re.sub(r"\s+", " ", txt).strip()
 
 
 def clean_thread_title(raw_title: str, messages: list[dict] | None = None) -> str:
-    cleaned = clean_ide_prompt(raw_title or "").replace("\n", " ").strip()
-    if not cleaned and messages:
+    cleaned = _norm_title_cand(raw_title)
+    if (not cleaned or _TRIVIAL_TITLE_RE.match(cleaned)) and messages:
         for m in messages:
             if m.get("role") == "user" and not m.get("context"):
-                cand = clean_ide_prompt(m.get("text") or "").replace("\n", " ").strip()
-                if cand and not cand.startswith("[非文本附件"):
+                cand = _norm_title_cand(m.get("text") or "")
+                if (
+                    cand
+                    and not cand.startswith(("[非文本附件", "<send_user_message", "# Files mentioned"))
+                    and not _TRIVIAL_TITLE_RE.match(cand)
+                ):
                     cleaned = cand[:80]
                     break
     return cleaned[:80] or "未命名对话"
@@ -222,7 +234,8 @@ def main():
                 else:
                     md_msgs = []
                     for blk in orig_txt.split("\n## "):
-                        if blk.startswith(("1. 用户", "2. 用户", "3. 用户")):
+                        first_ln = blk.splitlines()[0] if blk else ""
+                        if re.match(r"^\d+\.\s+用户\b", first_ln) and "会话上下文或控制标记" not in first_ln:
                             body_lines = [
                                 ln for ln in blk.splitlines()[1:]
                                 if not ln.startswith(("时间（UTC）：", "<!-- message_id:"))

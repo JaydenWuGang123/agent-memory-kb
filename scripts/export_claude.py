@@ -113,11 +113,13 @@ def parse_session(jsonl_path: Path):
                 "attachments": imgs,
             })
 
-    if not messages:
+    if not messages or not any(m["role"] == "user" for m in messages):
         return None
 
-    first_user = next((m["text"] for m in messages if m["role"] == "user"), "未命名 Claude Code 对话")
-    title = re.sub(r"\s+", " ", first_user).strip()[:80] or "未命名 Claude Code 对话"
+    trivial_re = re.compile(r"^(?:你好|您好|hi|hello|继续|你是什么模型|你有多少额度)[!！?？。.,，\s]*$", re.I)
+    user_texts = [re.sub(r"\s+", " ", m["text"]).strip() for m in messages if m["role"] == "user" and m["text"].strip()]
+    first_user = next((t for t in user_texts if not trivial_re.match(t)), user_texts[0] if user_texts else "未命名 Claude Code 对话")
+    title = first_user[:80] or "未命名 Claude Code 对话"
 
     return {
         "id": jsonl_path.stem,

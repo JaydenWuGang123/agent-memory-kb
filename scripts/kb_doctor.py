@@ -31,17 +31,28 @@ BUDGET_LIMITS = {
     "INDEX.md": 90,
     "README.md": 80,
     "个人档案.md": 300,
+    "笔记/前端设计与验收.md": 120,
     "笔记/进行中的项目.md": 220,
     "笔记/AI协作错题本.md": 220,
+    "笔记/财富与投资纪律.md": 200,
+    "笔记/个人事务与成长看板.md": 200,
     "笔记/知识库架构与治理.md": 200,
+    "笔记/技术分享-AI原生个人知识库实践.md": 250,
 }
 
 
 def check_links(root: Path, skip_external_links: bool = False) -> list[dict]:
     broken = []
     root_resolved = root.resolve()
-    curated = [root / "INDEX.md", root / "README.md", root / "个人档案.md", root / "同步规则.md", root / "跨设备配置.md"]
-    for sub in ("笔记", "笔记/历史档案", "共享摘录"):
+    curated = [
+        root / "INDEX.md",
+        root / "README.md",
+        root / "个人档案.md",
+        root / "同步规则.md",
+        root / "跨设备配置.md",
+        root / "对话索引.md",
+    ]
+    for sub in ("笔记", "笔记/历史档案", "共享摘录", "主题"):
         d = root / sub
         if d.is_dir():
             curated.extend(sorted(d.glob("*.md")))

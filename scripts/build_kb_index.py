@@ -98,7 +98,8 @@ def extract_codex_heartbeat_block(report_path: Path) -> str:
 
 
 def clean(value):
-    return re.sub(r'\s+', ' ', value).replace('|', '\\|').replace('[', '\\[').replace(']', '\\]')
+    val = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', str(value or ''))
+    return re.sub(r'\s+', ' ', val).replace('|', '｜').replace('[', '【').replace(']', '】')
 
 
 def category(record, cwd_map, cfg=None):
