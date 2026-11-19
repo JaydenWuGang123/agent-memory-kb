@@ -1,0 +1,6 @@
+# Core indexing, FTS5 search, DLP, doctor, and Git backup require only Python 3.9+ stdlib.
+# Optional dependencies below unlock the read-only MCP Server and local offline ONNX semantic vectors:
+mcp>=1.2.0
+onnxruntime>=1.18.0
+tokenizers>=0.19.0
+numpy>=1.26.0

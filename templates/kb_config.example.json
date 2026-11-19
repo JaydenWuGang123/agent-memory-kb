@@ -1,0 +1,38 @@
+{
+  "active_repos": [],
+  "cwd_categories": [
+    ["理财与规划", "invest|finance|etf|trading|portfolio"],
+    ["产品与个人项目", "side-project|indie|personal-project"],
+    ["学习与成长", "learning|study|personal-kb|agent-memory-kb"],
+    ["工程与工作项目", "/work/|/projects/|frontend|backend|webapp|service"]
+  ],
+  "title_categories": [
+    ["理财与规划", "投资|基金|ETF|资产|理财|定投|回测|预算|财务|finance|portfolio"],
+    ["生活与健康", "健康|健身|饮食|旅行|睡眠|生活|health|fitness"],
+    ["学习与成长", "学习|规划|读书|写作|英语|简历|面试|知识库|复盘|成长|learning"],
+    ["产品与个人项目", "个人项目|副业|独立开发|产品设计|side project|indie"],
+    ["工程与工作项目", "前端|后端|设计文档|接口|组件|React|Vue|TypeScript|Python|Go|Rust|Docker|K8s|SQL|bug|报错|修复|代码|重构|评审|CI|CD|eslint|webpack|vite|git"],
+    ["工具与效率", "Codex|ChatGPT|Claude|Cursor|Antigravity|Skill|MCP|Obsidian|MacBook|Linux|终端|命令|插件|自动化|脚本|快捷键|workflow"]
+  ],
+  "synonyms": [
+    ["个人知识库", "PKM", "知识库"],
+    ["容灾", "灾备", "备份"],
+    ["规范", "口径"]
+  ],
+  "sanitization_extra_patterns": [],
+  "extra_public_dirs": [],
+  "git_gc_loose_threshold": 300,
+  "icloud_lag_warn_hours": 4,
+  "restore_verify_interval_hours": 24,
+  "profile_auto_archive_lines": 260,
+  "staleness_warn_days": 14,
+  "macos_notify_on_error": true,
+  "alert_cooldown_hours": 12,
+  "private_git_remote": null,
+  "noise_filter": {
+    "drop_zero_message": true,
+    "probe_title_regex": "^Reply (?:with )?exactly (?:[A-Z0-9_]+_)?OK\\b",
+    "trivial_user_regex": "^(?:你好|您好|hi|hello)[!！?？。.,，\\s]*$",
+    "excluded_ids": []
+  }
+}

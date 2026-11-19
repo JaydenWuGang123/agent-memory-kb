@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "personal-kb": {
+      "command": "/usr/local/bin/python3",
+      "args": [
+        "/ABSOLUTE/PATH/TO/personal-kb/_同步/kb_mcp.py"
+      ],
+      "env": {
+        "AGENT_MEMORY_KB_ROOT": "/ABSOLUTE/PATH/TO/personal-kb"
+      }
+    }
+  }
+}

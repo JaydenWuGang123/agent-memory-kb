@@ -1,0 +1,17 @@
+#!/bin/zsh
+set -euo pipefail
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+KB_ROOT="${AGENT_MEMORY_KB_ROOT:-$HOME/personal-kb}"
+STATE_DIR="$HOME/.local/state/agent-memory-kb"
+mkdir -p "$STATE_DIR"
+
+# Auto-rotate logs above 1MB
+for lf in "$STATE_DIR/launchd.log" "$STATE_DIR/launchd.err.log"; do
+  if [[ -f "$lf" ]] && [[ $(wc -c < "$lf") -gt 1048576 ]]; then
+    tail -n 1000 "$lf" > "$lf.tmp" && mv -f "$lf.tmp" "$lf"
+  fi
+done
+
+python3 "$KB_ROOT/_同步/build_kb_index.py" --output-root "$KB_ROOT" --include-codex
