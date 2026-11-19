@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" font-family="SF Pro Display, PingFang SC, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1120"/>
+      <stop offset="100%" stop-color="#111C33"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="600" rx="16" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="5" rx="2" fill="url(#accent)"/>
+
+  <!-- Top Header Strip -->
+  <text x="36" y="44" font-size="18" font-weight="700" fill="#F8FAFC">agent-memory-kb</text>
+  <text x="208" y="44" font-size="14" fill="#94A3B8">Local-First Multi-Agent Memory · Offline CJK Hybrid Search · Read-Only MCP</text>
+  <rect x="942" y="22" width="222" height="30" rx="15" fill="#0F2922" stroke="#22C55E" stroke-width="1"/>
+  <text x="1053" y="42" text-anchor="middle" font-size="13" font-weight="600" fill="#4ADE80">17/17 Tests OK · healthy: true</text>
+
+  <!-- Left Window: Terminal Showcase -->
+  <g transform="translate(36, 72)">
+    <rect x="0" y="0" width="554" height="492" rx="12" fill="#070B14" stroke="#1E3A5F" stroke-width="1.2"/>
+    <rect x="0" y="0" width="554" height="36" rx="12" fill="#111827"/>
+    <circle cx="20" cy="18" r="6" fill="#EF4444"/>
+    <circle cx="40" cy="18" r="6" fill="#F59E0B"/>
+    <circle cx="60" cy="18" r="6" fill="#22C55E"/>
+    <text x="277" y="23" text-anchor="middle" font-size="13" fill="#94A3B8" font-family="SF Mono, Menlo, monospace">zsh — ~/personal-kb (CLI &amp; MCP Engine)</text>
+
+    <g font-family="SF Mono, Menlo, Consolas, monospace" font-size="13">
+      <text x="20" y="68" fill="#38BDF8">$ python3 init_kb.py --root ~/personal-kb --profile dev</text>
+      <text x="20" y="92" fill="#4ADE80">Initialized Agent Memory KB (16 scripts, 7 templates, pre-commit DLP)</text>
+
+      <text x="20" y="132" fill="#38BDF8">$ python3 _同步/kb_search.py -q "falsy zero filter" --mode hybrid</text>
+      <text x="20" y="156" fill="#94A3B8">[FTS5 + INT8 ONNX RRF · 18ms · Top 2 hits]</text>
+      <rect x="20" y="168" width="514" height="72" rx="6" fill="#0F172A" stroke="#1E3A5F"/>
+      <text x="34" y="190" fill="#F8FAFC" font-weight="700">1. 笔记/AI协作错题本.md  (score: 0.0328 · 2026-11-18)</text>
+      <text x="34" y="212" fill="#CBD5E1">   Never use filter(Boolean) or || fallback on valid 0 values;</text>
+      <text x="34" y="230" fill="#CBD5E1">   explicitly separate 0 from null/undefined.</text>
+
+      <text x="20" y="274" fill="#38BDF8">$ python3 _同步/kb_doctor.py --root ~/personal-kb</text>
+      <rect x="20" y="286" width="514" height="106" rx="6" fill="#0A1A16" stroke="#166534"/>
+      <text x="34" y="308" fill="#4ADE80">{</text>
+      <text x="34" y="328" fill="#86EFAC">  "healthy": true, "broken_links": [], "secret_leaks": [],</text>
+      <text x="34" y="348" fill="#86EFAC">  "missing_citations": [], "sanitization_violations": [],</text>
+      <text x="34" y="368" fill="#86EFAC">  "budget_warnings": [], "stale_warnings": []</text>
+      <text x="34" y="386" fill="#4ADE80">}</text>
+
+      <text x="20" y="426" fill="#38BDF8">$ python3 _同步/kb_restore_verify.py --check-icloud</text>
+      <text x="20" y="450" fill="#4ADE80">{"ok": true, "head_parity": "local = bundle = iCloud_AES256 = private_git"}</text>
+      <text x="20" y="474" fill="#64748B">✓ 100% Local-First · Zero Cloud Memory API Cost</text>
+    </g>
+  </g>
+
+  <!-- Right Window: Obsidian Living Dashboard & MCP Handoff -->
+  <g transform="translate(610, 72)">
+    <rect x="0" y="0" width="554" height="492" rx="12" fill="#F8FAFC" stroke="#334155" stroke-width="1.2"/>
+    <rect x="0" y="0" width="554" height="36" rx="12" fill="#E2E8F0"/>
+    <circle cx="20" cy="18" r="6" fill="#94A3B8"/>
+    <circle cx="40" cy="18" r="6" fill="#94A3B8"/>
+    <circle cx="60" cy="18" r="6" fill="#94A3B8"/>
+    <text x="277" y="23" text-anchor="middle" font-size="13" font-weight="600" fill="#334155">Obsidian Vault — 笔记/进行中的项目.md (E2EE Synced)</text>
+
+    <!-- Title -->
+    <text x="24" y="70" font-size="18" font-weight="700" fill="#0F172A">Active Projects &amp; Live Git Probe</text>
+    <text x="24" y="92" font-size="12" fill="#64748B">Auto-refreshed every 30 min · Consumed by Codex / Cursor / Claude via MCP</text>
+
+    <!-- Live Git Table -->
+    <rect x="24" y="108" width="506" height="148" rx="8" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <rect x="24" y="108" width="506" height="32" rx="8" fill="#0F172A"/>
+    <text x="38" y="129" font-size="12" font-weight="700" fill="#38BDF8">Repository</text>
+    <text x="182" y="129" font-size="12" font-weight="700" fill="#38BDF8">Branch</text>
+    <text x="304" y="129" font-size="12" font-weight="700" fill="#38BDF8">Status</text>
+    <text x="412" y="129" font-size="12" font-weight="700" fill="#38BDF8">Checkpoint</text>
+
+    <text x="38" y="164" font-size="13" font-weight="600" fill="#0F172A">web-dashboard</text>
+    <text x="182" y="164" font-size="12" fill="#2563EB">feat/batch-ui</text>
+    <text x="304" y="164" font-size="12" fill="#059669">Clean</text>
+    <text x="412" y="164" font-size="12" fill="#475569">MR open</text>
+    <line x1="36" y1="178" x2="516" y2="178" stroke="#F1F5F9"/>
+
+    <text x="38" y="202" font-size="13" font-weight="600" fill="#0F172A">api-gateway</text>
+    <text x="182" y="202" font-size="12" fill="#2563EB">main</text>
+    <text x="304" y="202" font-size="12" fill="#D97706">2 dirty</text>
+    <text x="412" y="202" font-size="12" fill="#475569">Auth tests</text>
+    <line x1="36" y1="216" x2="516" y2="216" stroke="#F1F5F9"/>
+
+    <rect x="30" y="222" width="494" height="28" rx="4" fill="#FEF2F2"/>
+    <text x="38" y="241" font-size="13" font-weight="700" fill="#BE123C">tax-query-v2</text>
+    <text x="182" y="241" font-size="12" fill="#BE123C">iter-1126</text>
+    <text x="304" y="241" font-size="12" font-weight="700" fill="#BE123C">PAUSED</text>
+    <text x="412" y="241" font-size="12" fill="#9F1239">Wait merge</text>
+
+    <!-- MCP 3-Hop Handoff Box -->
+    <rect x="24" y="274" width="506" height="196" rx="8" fill="#EFF6FF" stroke="#93C5FD"/>
+    <text x="42" y="302" font-size="14" font-weight="700" fill="#1E40AF">3-Hop Read-Only MCP Handoff (10s Resume, ~85% Less Tokens)</text>
+
+    <rect x="42" y="318" width="470" height="40" rx="6" fill="#FFFFFF" stroke="#BFDBFE"/>
+    <text x="56" y="343" font-size="13" fill="#0F172A"><tspan font-weight="700" fill="#2563EB">Hop 1</tspan>  kb_overview() → 33-line INDEX.md (~400 tokens)</text>
+
+    <rect x="42" y="366" width="470" height="40" rx="6" fill="#FFFFFF" stroke="#6EE7B7"/>
+    <text x="56" y="391" font-size="13" fill="#0F172A"><tspan font-weight="700" fill="#059669">Hop 2</tspan>  kb_project_context() + kb_mistakes_and_guardrails()</text>
+
+    <rect x="42" y="414" width="470" height="40" rx="6" fill="#FFFFFF" stroke="#FCD34D"/>
+    <text x="56" y="439" font-size="13" fill="#0F172A"><tspan font-weight="700" fill="#D97706">Hop 3</tspan>  kb_search_query() → On-demand Top-K quotes (SQLite)</text>
+  </g>
+</svg>

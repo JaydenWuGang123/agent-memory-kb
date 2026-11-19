@@ -12,6 +12,8 @@
 > **核心理念**：*AI 时代的知识库，第一读者不是人，而是你的 Agent。*
 > 零云端记忆 API 费用，100% 本地 Markdown + SQLite FTS5 中文混合检索 + 离线 INT8 ONNX 语义向量 + 错题本自动复盘 + DLP 防泄密与四端加密容灾。
 
+![agent-memory-kb 终端与 Obsidian 实景演示](docs/assets/demo-overview.svg)
+
 ---
 
 ## 为什么做 `agent-memory-kb`？
@@ -78,9 +80,11 @@ pip install -r requirements.txt
 
 参照 [`examples/mcp_config.example.json`](examples/mcp_config.example.json) 将 `~/personal-kb/_同步/kb_mcp.py` 注册进 **Codex / Cursor / Claude Code / Antigravity**，并将 [`examples/agent-rules.md`](examples/agent-rules.md) 放入全局 Agent 规则（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`）。
 
-### 4. 开启后台定时同步与手机端加密同步（可选）
+### 4. 开启跨平台定时同步（macOS / Linux / Windows）与手机端加密同步（可选）
 
-- **macOS 每 30 分钟后台同步 + 钥匙串 AES-256 iCloud 容灾**：配置 [`examples/personal-kb-sync.sh.example`](examples/personal-kb-sync.sh.example) 与 [`examples/launchd.personal-kb-sync.plist.example`](examples/launchd.personal-kb-sync.plist.example)。
+- **macOS（`launchd` + 钥匙串 AES-256 iCloud 容灾）**：[`examples/personal-kb-sync.sh.example`](examples/personal-kb-sync.sh.example) 与 [`examples/launchd.personal-kb-sync.plist.example`](examples/launchd.personal-kb-sync.plist.example)。
+- **Linux（`systemd` 用户定时器）**：[`examples/linux-systemd/agent-memory-kb.service`](examples/linux-systemd/agent-memory-kb.service) 与 [`examples/linux-systemd/agent-memory-kb.timer`](examples/linux-systemd/agent-memory-kb.timer)。
+- **Windows（PowerShell + 任务计划程序）**：[`examples/windows-sync.ps1`](examples/windows-sync.ps1)。
 - **免费手机端端到端加密同步**：用 Obsidian 打开 `~/personal-kb`，按 [`templates/跨设备配置.md`](templates/跨设备配置.md) 配置 Remotely Save（OneDrive 应用目录 + RClone Crypt）。
 
 ---

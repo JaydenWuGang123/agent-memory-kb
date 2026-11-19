@@ -12,6 +12,8 @@
 > **Core Philosophy**: *In the AI coding era, the first reader of your knowledge base is your Agent — not you.*
 > Zero cloud memory API fees. 100% local Markdown + SQLite FTS5 + offline INT8 ONNX semantic search + automated AI mistake-book evolution + industrial DLP & encrypted 4-way disaster recovery.
 
+![agent-memory-kb Terminal & Obsidian Showcase](docs/assets/demo-overview.svg)
+
 ---
 
 ## Why `agent-memory-kb`?
@@ -78,9 +80,11 @@ pip install -r requirements.txt
 
 Register `~/personal-kb/_同步/kb_mcp.py` in Codex / Cursor / Claude Code / Antigravity using [`examples/mcp_config.example.json`](examples/mcp_config.example.json), and add [`examples/agent-rules.md`](examples/agent-rules.md) to your global agent instructions (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`).
 
-### 4. Background Sync & E2EE Mobile Sync (Optional)
+### 4. Background Sync (macOS / Linux / Windows) & E2EE Mobile Sync (Optional)
 
-- **macOS 30-min daemon + Keychain AES-256 iCloud mirror**: configure [`examples/personal-kb-sync.sh.example`](examples/personal-kb-sync.sh.example) & [`examples/launchd.personal-kb-sync.plist.example`](examples/launchd.personal-kb-sync.plist.example).
+- **macOS (`launchd` + Keychain AES-256 iCloud mirror)**: [`examples/personal-kb-sync.sh.example`](examples/personal-kb-sync.sh.example) & [`examples/launchd.personal-kb-sync.plist.example`](examples/launchd.personal-kb-sync.plist.example).
+- **Linux (`systemd` user timer)**: [`examples/linux-systemd/agent-memory-kb.service`](examples/linux-systemd/agent-memory-kb.service) & [`examples/linux-systemd/agent-memory-kb.timer`](examples/linux-systemd/agent-memory-kb.timer).
+- **Windows (PowerShell + Task Scheduler)**: [`examples/windows-sync.ps1`](examples/windows-sync.ps1).
 - **Zero-cost E2EE Mobile Sync**: open `~/personal-kb` in Obsidian and follow [`templates/跨设备配置.md`](templates/跨设备配置.md) (Remotely Save + OneDrive App Folder + RClone Crypt).
 
 ---

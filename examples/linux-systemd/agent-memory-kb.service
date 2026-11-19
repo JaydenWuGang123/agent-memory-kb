@@ -1,0 +1,10 @@
+[Unit]
+Description=Agent Memory KB Periodic Sync
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=AGENT_MEMORY_KB_ROOT=%h/personal-kb
+ExecStart=/usr/bin/python3 %h/personal-kb/_同步/build_kb_index.py --output-root %h/personal-kb --skip-icloud
+StandardOutput=journal
+StandardError=journal
