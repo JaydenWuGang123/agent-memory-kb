@@ -19,10 +19,22 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import atomic_write_text, load_noise_filter, redact_secrets, should_skip_conversation, should_skip_exported_markdown  # noqa: E402
+from kb_filters import atomic_write_text, clean_ide_prompt, load_noise_filter, redact_secrets, should_skip_conversation, should_skip_exported_markdown  # noqa: E402
 
 VERSION = 3
 VISIBLE_PHASES = {None, "commentary", "final", "final_answer"}
+
+
+def clean_thread_title(raw_title: str, messages: list[dict] | None = None) -> str:
+    cleaned = clean_ide_prompt(raw_title or "").replace("\n", " ").strip()
+    if not cleaned and messages:
+        for m in messages:
+            if m.get("role") == "user" and not m.get("context"):
+                cand = clean_ide_prompt(m.get("text") or "").replace("\n", " ").strip()
+                if cand and not cand.startswith("[非文本附件"):
+                    cleaned = cand[:80]
+                    break
+    return cleaned[:80] or "未命名对话"
 
 
 def iso(value):
@@ -148,8 +160,7 @@ def rollout_messages(path, offset=0, turn_id=None):
 
 
 def render(thread, messages, limitations, synced_at):
-    title = thread["title"] or "未命名对话"
-    title_line = title.replace("\n", " ")
+    title_line = clean_thread_title(thread["title"], messages)
     lines = [f"# {title_line}", "", "<!-- 自动生成：下次同步会刷新本文件；手写整理请放在主题文档。 -->", "",
         f"- 来源：Codex 本地会话；[在 Codex 中打开](codex://threads/{thread['id']})",
         f"- 会话 ID：`{thread['id']}`", f"- 创建时间（UTC）：{iso(thread['created_at'])}",
@@ -252,7 +263,7 @@ def main():
         atomic_write_text(target, body)
         turns = {message["turn_id"] for message in messages if message["turn_id"]}
         previous[thread_id] = {
-            "id": thread_id, "title": thread["title"] or "未命名对话", "cwd": thread["cwd"] or "", "source": "codex", "path": relative,
+            "id": thread_id, "title": clean_thread_title(thread["title"], messages), "cwd": thread["cwd"] or "", "source": "codex", "path": relative,
             "turn_count": len(turns), "message_count": len(messages),
             "complete": not bool(limitations), "limitations": limitations,
             "updated_at": iso(thread["updated_at"]), "created_at": iso(thread["created_at"]),

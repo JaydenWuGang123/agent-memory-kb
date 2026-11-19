@@ -205,6 +205,14 @@ def load_noise_filter(root: Path) -> dict:
     return cfg
 
 
+def clean_ide_prompt(text: str) -> str:
+    """Strip IDE boilerplate headers (# Context from my IDE setup / # Files mentioned by the user) up to ## My request:."""
+    txt = (text or "").strip()
+    if "## My request:" in txt:
+        txt = txt.split("## My request:", 1)[1].strip()
+    return txt
+
+
 def should_skip_conversation(
     conv_id: str,
     title: str,
@@ -218,7 +226,7 @@ def should_skip_conversation(
     if nf.get("drop_zero_message", True) and not messages:
         return True
 
-    clean_title = (title or "").strip()
+    clean_title = clean_ide_prompt(title or "")
     probe_pat = nf.get("probe_title_regex")
     if probe_pat and len(messages) <= 6 and re.search(probe_pat, clean_title, re.I):
         return True
@@ -227,12 +235,13 @@ def should_skip_conversation(
         return False
 
     user_msgs = [
-        (m.get("text") or "").strip()
+        clean_ide_prompt(m.get("text") or "")
         for m in messages
         if m.get("role") == "user" and not m.get("context")
     ]
+    user_msgs = [u for u in user_msgs if u]
     if not user_msgs:
-        return False
+        return True
 
     trivial_pat = nf.get("trivial_user_regex")
     if not trivial_pat or not all(re.match(trivial_pat, txt, re.I) for txt in user_msgs):

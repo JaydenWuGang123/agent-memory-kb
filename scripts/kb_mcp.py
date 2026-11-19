@@ -201,26 +201,71 @@ def kb_project_context_data(
             if sec.startswith("### ") and any(kv in sec.lower() for kv in key_variants):
                 matched_sections.append(sec.strip())
 
+    known_projects = (
+        "employee-web-wx", "hr-agent-h5", "salary-web-pc", "openxsb-web",
+        "iit", "frontend-design-doc", "xtolls", "xtools", "etf-watch-mac",
+        "agent-memory-kb", "personal-kb", "expense-learning",
+    )
+
+    def _is_valid_project_chat_hit(h: dict) -> bool:
+        if h.get("source") == "note" or h.get("tier") == "curated":
+            return False
+        if h.get("role") == "meta" or h.get("section") == "文件头部":
+            return False
+        t_low = (h.get("title") or "").strip().lower()
+        if t_low in ("你好", "您好", "hi", "hello", "未命名对话", "未命名 antigravity 对话"):
+            return False
+        title_matches_key = any(kv in t_low for kv in key_variants)
+        # Rule A: If conversation has a specific repo cwd, it must not conflict with the queried project
+        h_cwd = (h.get("cwd") or "").strip()
+        if h_cwd and not title_matches_key:
+            cwd_slug = Path(h_cwd).name.lower()
+            if cwd_slug not in ("", "wugang", "工作", "个人") and not any(kv in h_cwd.lower() for kv in key_variants):
+                return False
+        # Rule B: Exclude cross-project overview/inventory dumps that list many unrelated projects
+        if not title_matches_key:
+            if any(meta_kw in t_low for meta_kw in ("个人知识库", "调用我的知识库", "作为codex的影子", "这是被封了吗")):
+                return False
+            snip_low = (h.get("snippet") or "").lower()
+            other_hits = sum(1 for kp in known_projects if kp not in key_variants and kp in snip_low)
+            if other_hits >= 2:
+                return False
+        return True
+
     recent_res: list[dict] = []
     if key and (include_recent or not matched_sections):
+        seen_paths: set[str] = set()
         for kv in key_variants:
-            hits = _fts_via_sys_python(root, kv, "all", "all", kv, "", 4, 1)
+            hits = _fts_via_sys_python(root, kv, "all", "all", kv, "", 12, 2)
             for h in hits:
-                if (h.get("path"), h.get("line")) not in {(r.get("path"), r.get("line")) for r in recent_res}:
+                if _is_valid_project_chat_hit(h) and h.get("path") not in seen_paths:
                     recent_res.append(h)
+                    seen_paths.add(h.get("path", ""))
+                    if len(recent_res) >= 4:
+                        break
             if len(recent_res) >= 4:
                 break
-        if len(recent_res) < 2:
-            broad_hits = _fts_via_sys_python(root, key, "all", "all", "", "", 4, 1)
-            seen = {(r.get("path"), r.get("line")) for r in recent_res}
-            for h in broad_hits:
-                if (h.get("path"), h.get("line")) not in seen:
-                    recent_res.append(h)
-                    seen.add((h.get("path"), h.get("line")))
+        if len(recent_res) < 4:
+            for kv in key_variants:
+                broad_hits = _fts_via_sys_python(root, kv, "all", "all", "", "", 12, 2)
+                for h in broad_hits:
+                    if _is_valid_project_chat_hit(h) and h.get("path") not in seen_paths:
+                        recent_res.append(h)
+                        seen_paths.add(h.get("path", ""))
+                        if len(recent_res) >= 4:
+                            break
                 if len(recent_res) >= 4:
                     break
-        if not recent_res:
-            recent_res = kb_search_data(key, mode="hybrid", limit=4, per_conv=1, root=root).get("results", [])
+        if not recent_res and not matched_sections:
+            hyb_hits = kb_search_data(key, mode="hybrid", limit=12, per_conv=1, root=root).get("results", [])
+            for h in hyb_hits:
+                if "fts" not in (h.get("match_via") or "") and float(h.get("score") or 0.0) < 0.55:
+                    continue
+                if _is_valid_project_chat_hit(h) and h.get("path") not in seen_paths:
+                    recent_res.append(h)
+                    seen_paths.add(h.get("path", ""))
+                    if len(recent_res) >= 4:
+                        break
 
     payload: dict = {
         "query": cwd_or_project,

@@ -108,11 +108,21 @@ def parse_conversation(conv_dir: Path):
                     "truncated": "content" in (record.get("truncated_fields") or []),
                 })
 
-    if not messages:
+    if not messages or not any(m["role"] == "user" for m in messages):
         return None
 
     first_user = next((m["text"] for m in messages if m["role"] == "user"), "未命名 Antigravity 对话")
     title = re.sub(r"\s+", " ", first_user).strip()[:80] or "未命名 Antigravity 对话"
+
+    if cwd:
+        repo_slug = Path(cwd).name.lower()
+        title_low = title.lower()
+        if any(k in title_low for k in ("个人知识库", "知识库", "personal-kb", "agent-memory-kb")) and repo_slug not in title_low:
+            cwd = str(Path.home() / "personal-kb")
+        elif repo_slug:
+            all_user_low = "\n".join(m["text"].lower() for m in messages if m["role"] == "user")
+            if repo_slug not in all_user_low and any(k in title_low for k in ("什么时候到期", "修改2fa", "2fa")):
+                cwd = ""
 
     return {
         "id": conv_dir.name,
