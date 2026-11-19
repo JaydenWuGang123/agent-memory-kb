@@ -220,7 +220,21 @@ def main():
                     target.unlink(missing_ok=True)
                     pruned_noise += 1
                 else:
-                    clean_txt = redact_secrets(orig_txt)
+                    md_msgs = []
+                    for blk in orig_txt.split("\n## "):
+                        if blk.startswith(("1. 用户", "2. 用户", "3. 用户")):
+                            body_lines = [
+                                ln for ln in blk.splitlines()[1:]
+                                if not ln.startswith(("时间（UTC）：", "<!-- message_id:"))
+                            ]
+                            md_msgs.append({"role": "user", "text": "\n".join(body_lines).strip()})
+                    cleaned_t = clean_thread_title(thread["title"] or "", md_msgs)
+                    if thread_id in previous and previous[thread_id].get("title") != cleaned_t:
+                        previous[thread_id]["title"] = cleaned_t
+                    txt_lines = orig_txt.splitlines()
+                    if txt_lines and txt_lines[0].startswith("# "):
+                        txt_lines[0] = f"# {cleaned_t}"
+                    clean_txt = redact_secrets("\n".join(txt_lines) + ("\n" if orig_txt.endswith("\n") else ""))
                     if clean_txt != orig_txt:
                         atomic_write_text(target, clean_txt)
                         changed += 1

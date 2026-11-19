@@ -110,19 +110,32 @@ def parse_conversation_messages(md_path: Path, root: Path, meta: dict) -> list[d
     cur_time = meta.get("updated_at", "未知")
     cur_line = 1
     buf: list[str] = []
+    last_user_topic = ""
+    conv_title = (meta.get("title") or md_path.stem).strip()
 
     def flush():
+        nonlocal last_user_topic
         body = "\n".join(buf).strip()
         if body:
+            sec_label = cur_header
+            if cur_role == "user" and "会话上下文或控制标记" not in cur_header:
+                raw_u = body.split("## My request:", 1)[1].strip() if "## My request:" in body else body
+                raw_u = raw_u.replace("[非文本附件：保留在原始会话中，本次文本归档未复制附件。]", "").strip()
+                clean_u = re.sub(r"\s+", " ", raw_u).strip()
+                if clean_u:
+                    last_user_topic = clean_u[:36]
+            elif cur_role == "assistant" and last_user_topic and len(chunks) >= 3:
+                if last_user_topic[:18].lower() not in conv_title.lower():
+                    sec_label = f"{cur_header} · 问:{last_user_topic}"
             chunks.append({
                 "tier": "archive",
                 "source": meta.get("source", md_path.parent.name.lower()),
                 "path": rel,
                 "abs_path": str(md_path),
-                "title": meta.get("title", md_path.stem),
+                "title": conv_title,
                 "cwd": meta.get("cwd", ""),
                 "updated_at": meta.get("updated_at", ""),
-                "section": cur_header,
+                "section": sec_label,
                 "role": cur_role,
                 "time": cur_time,
                 "line": cur_line,
@@ -289,6 +302,13 @@ def _target_file_meta(rel: str, kind: str, fpath: Path, meta: dict | None) -> tu
     )
 
 
+def _doc_title_tok(file_title: str, section: str) -> str:
+    t_tok = cjk_tokenize(file_title)
+    if "· 问:" in (section or ""):
+        return f"{t_tok} {cjk_tokenize(section)}".strip()
+    return t_tok
+
+
 def _insert_file_and_chunks(
     conn: sqlite3.Connection,
     root: Path,
@@ -305,7 +325,6 @@ def _insert_file_and_chunks(
     )
     file_id = cur.lastrowid
     chunks = parse_curated_chunks(fpath, root) if kind == "curated" else parse_conversation_messages(fpath, root, meta or {})
-    title_tok = cjk_tokenize(title)
     for r in chunks:
         doc_cur = conn.execute(
             "INSERT INTO docs(file_id, section, role, time, line, body) VALUES (?, ?, ?, ?, ?, ?)",
@@ -313,7 +332,7 @@ def _insert_file_and_chunks(
         )
         conn.execute(
             "INSERT INTO docs_fts(rowid, title_tok, body_tok) VALUES (?, ?, ?)",
-            (doc_cur.lastrowid, title_tok, cjk_tokenize(r["body"])),
+            (doc_cur.lastrowid, _doc_title_tok(title, r["section"]), cjk_tokenize(r["body"])),
         )
 
 
@@ -375,13 +394,13 @@ def build_search_index(root: Path, stats_out: dict | None = None, force_compact:
                 if prev is not None:
                     fid = prev[0]
                     t_row = conn.execute("SELECT title FROM files WHERE id = ?", (fid,)).fetchone()
-                    t_tok = cjk_tokenize(t_row[0]) if t_row else ""
-                    doc_rows = conn.execute("SELECT id, body FROM docs WHERE file_id = ?", (fid,)).fetchall()
+                    old_title = t_row[0] if t_row else ""
+                    doc_rows = conn.execute("SELECT id, section, body FROM docs WHERE file_id = ?", (fid,)).fetchall()
                     deleted_chunks += len(doc_rows)
-                    for did, dbody in doc_rows:
+                    for did, dsec, dbody in doc_rows:
                         conn.execute(
                             "INSERT INTO docs_fts(docs_fts, rowid, title_tok, body_tok) VALUES ('delete', ?, ?, ?)",
-                            (did, t_tok, cjk_tokenize(dbody)),
+                            (did, _doc_title_tok(old_title, dsec), cjk_tokenize(dbody)),
                         )
                     conn.execute("DELETE FROM docs WHERE file_id = ?", (fid,))
                     conn.execute("DELETE FROM files WHERE id = ?", (fid,))

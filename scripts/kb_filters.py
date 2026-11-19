@@ -206,10 +206,15 @@ def load_noise_filter(root: Path) -> dict:
 
 
 def clean_ide_prompt(text: str) -> str:
-    """Strip IDE boilerplate headers (# Context from my IDE setup / # Files mentioned by the user) up to ## My request:."""
+    """Strip IDE boilerplate headers (# Context from my IDE setup / # Files mentioned by the user / Referenced ChatGPT conversation)."""
     txt = (text or "").strip()
     if "## My request:" in txt:
         txt = txt.split("## My request:", 1)[1].strip()
+    elif "User request:" in txt and "## Referenced ChatGPT conversation:" in txt:
+        txt = txt.split("User request:", 1)[1].strip()
+    elif txt.startswith(("# Files mentioned by the user:", "# Context from my IDE setup:", "## Referenced ChatGPT conversation:")):
+        # If the entire string was truncated inside the header before '## My request:', return empty so caller falls back to body
+        return ""
     return txt
 
 

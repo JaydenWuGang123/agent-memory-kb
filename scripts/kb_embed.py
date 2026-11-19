@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - graceful fallback when runtime lacks O
 
 DEFAULT_MODEL_DIR = Path.home() / ".cache" / "magpie" / "paraphrase-multilingual-MiniLM-L12-v2" / "2c4055b12046"
 EMBED_DIM = 384
-MAX_CHUNKS_PER_ARCHIVE_CONV = 4
+MAX_CHUNKS_PER_ARCHIVE_CONV = 24
 VECTOR_SCHEMA_VERSION = "1"
 _VEC_CACHE: dict[str, tuple[int, list[tuple], "np.ndarray"]] = {}
 
@@ -149,8 +149,24 @@ def _vec_schema_current(vpath: Path) -> bool:
         return False
 
 
+def _sample_timeline(items: list[tuple], cap: int) -> list[tuple]:
+    if len(items) <= cap or cap <= 0:
+        return items[:cap]
+    if cap <= 2:
+        return [items[0], items[-1]][:cap]
+    head = items[:2]
+    tail = items[-2:]
+    middle = items[2:-2]
+    rem = cap - len(head) - len(tail)
+    if rem <= 0 or not middle:
+        return (head + tail)[:cap]
+    step = len(middle) / float(rem)
+    picked_mid = [middle[min(len(middle) - 1, int(i * step))] for i in range(rem)]
+    return head + picked_mid + tail
+
+
 def _select_representative_chunks(chunks: list[tuple]) -> list[tuple[int, str]]:
-    """Select curated chunks or up to MAX_CHUNKS_PER_ARCHIVE_CONV meaningful turns for embedding."""
+    """Select curated chunks or up to MAX_CHUNKS_PER_ARCHIVE_CONV timeline-distributed turns for embedding."""
     selected: list[tuple[int, str]] = []
     for doc_id, tier, title, section, role, body in chunks:
         cleaned = _clean_for_embedding(body)
@@ -159,9 +175,10 @@ def _select_representative_chunks(chunks: list[tuple]) -> list[tuple[int, str]]:
         if tier == "curated":
             selected.append((doc_id, f"{title} / {section}: {cleaned}"))
         else:
-            if role == "meta":
+            if role == "meta" or "会话上下文或控制标记" in (section or ""):
                 continue
-            selected.append((doc_id, f"{title}: {cleaned}"))
+            label = f"{title} / {section}" if "· 问:" in (section or "") else title
+            selected.append((doc_id, f"{label}: {cleaned}"))
             if len(selected) >= MAX_CHUNKS_PER_ARCHIVE_CONV:
                 break
     return selected
@@ -213,11 +230,13 @@ def sync_vectors(
             (fid,),
         ).fetchall()
         raw_list = [(d_id, tier, title, sec, role, body) for d_id, sec, role, body in doc_rows]
-        # Build explicit user-first / assistant summary choice for archive files
+        # Build timeline-distributed user + assistant sampling for archive files (covers multi-topic switches)
         if tier == "archive":
-            user_first = [x for x in raw_list if x[4] == "user"][:3]
-            asst_tail = [x for x in raw_list if x[4] == "assistant"][-1:]
-            ordered = user_first + asst_tail
+            user_turns = [x for x in raw_list if x[4] == "user" and "会话上下文或控制标记" not in (x[3] or "") and len(_clean_for_embedding(x[5])) >= 14]
+            asst_turns = [x for x in raw_list if x[4] == "assistant" and len(_clean_for_embedding(x[5])) >= 40]
+            if not asst_turns:
+                asst_turns = [x for x in raw_list if x[4] == "assistant" and len(_clean_for_embedding(x[5])) >= 14]
+            ordered = _sample_timeline(user_turns, 14) + _sample_timeline(asst_turns, 10)
         else:
             ordered = raw_list
         role_map = {d_id: role for d_id, _, _, _, role, _ in raw_list}
