@@ -8,6 +8,7 @@ multi-keyword AND with configurable synonym expansion, and falls back to disk sc
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 from pathlib import Path
@@ -224,7 +225,7 @@ def _init_schema_v3(conn: sqlite3.Connection):
     )
     conn.execute("CREATE INDEX idx_docs_file ON docs(file_id)")
     conn.execute(
-        "CREATE VIRTUAL TABLE docs_fts USING fts5(title_tok, body_tok, content='', contentless_delete=1, tokenize='unicode61')"
+        "CREATE VIRTUAL TABLE docs_fts USING fts5(title_tok, body_tok, content='', tokenize='unicode61')"
     )
 
 
@@ -234,8 +235,14 @@ def _schema_is_current(db_path: Path) -> bool:
     try:
         conn = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0)
         row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+        fts_sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='docs_fts'").fetchone()
         conn.close()
-        return bool(row and row[0] == SCHEMA_VERSION)
+        return bool(
+            row
+            and row[0] == SCHEMA_VERSION
+            and fts_sql
+            and "contentless_delete" not in (fts_sql[0] or "")
+        )
     except Exception:
         return False
 
@@ -367,10 +374,15 @@ def build_search_index(root: Path, stats_out: dict | None = None, force_compact:
                 prev = prev_map.get(rel)
                 if prev is not None:
                     fid = prev[0]
-                    doc_ids = [r[0] for r in conn.execute("SELECT id FROM docs WHERE file_id = ?", (fid,)).fetchall()]
-                    deleted_chunks += len(doc_ids)
-                    for did in doc_ids:
-                        conn.execute("DELETE FROM docs_fts WHERE rowid = ?", (did,))
+                    t_row = conn.execute("SELECT title FROM files WHERE id = ?", (fid,)).fetchone()
+                    t_tok = cjk_tokenize(t_row[0]) if t_row else ""
+                    doc_rows = conn.execute("SELECT id, body FROM docs WHERE file_id = ?", (fid,)).fetchall()
+                    deleted_chunks += len(doc_rows)
+                    for did, dbody in doc_rows:
+                        conn.execute(
+                            "INSERT INTO docs_fts(docs_fts, rowid, title_tok, body_tok) VALUES ('delete', ?, ?, ?)",
+                            (did, t_tok, cjk_tokenize(dbody)),
+                        )
                     conn.execute("DELETE FROM docs WHERE file_id = ?", (fid,))
                     conn.execute("DELETE FROM files WHERE id = ?", (fid,))
 
@@ -391,7 +403,14 @@ def build_search_index(root: Path, stats_out: dict | None = None, force_compact:
     if (force_compact or compacted or freelist_pages >= 64) and freelist_pages > 0:
         vac_conn = sqlite3.connect(str(db_path), timeout=10.0, isolation_level=None)
         try:
-            vac_conn.execute(f"PRAGMA incremental_vacuum({freelist_pages})").fetchall()
+            for _ in range(freelist_pages + 2):
+                cur_fl = vac_conn.execute("PRAGMA freelist_count").fetchone()[0]
+                if cur_fl <= 0:
+                    break
+                vac_conn.execute(f"PRAGMA incremental_vacuum({cur_fl})").fetchall()
+                next_fl = vac_conn.execute("PRAGMA freelist_count").fetchone()[0]
+                if next_fl >= cur_fl:
+                    break
             freelist_pages = vac_conn.execute("PRAGMA freelist_count").fetchone()[0]
             compacted = True
         finally:
@@ -496,7 +515,58 @@ def _search_via_sqlite(
                 LIMIT ?
             """
             try:
-                rows = conn.execute(sql, [fts_query, *params, effective_per_conv, limit]).fetchall()
+                rows = list(conn.execute(sql, [fts_query, *params, effective_per_conv, limit]).fetchall())
+                # Multi-keyword quorum rescue ((N-1)-of-N AND) when strict AND misses curated notes or under-fills limit
+                has_curated = any(r["tier"] == "curated" for r in rows)
+                if len(fts_parts) >= 2 and (len(rows) < limit or (source in ("all", "notes") and not has_curated)):
+                    if len(fts_parts) == 2 and not rows:
+                        quorum_q = f"{fts_parts[0]} OR {fts_parts[1]}"
+                    elif 3 <= len(fts_parts) <= 6:
+                        k = len(fts_parts) - 1
+                        quorum_q = " OR ".join("(" + " AND ".join(c) + ")" for c in itertools.combinations(fts_parts, k))
+                    else:
+                        quorum_q = ""
+                    if quorum_q:
+                        quorum_sql = f"""
+                            WITH raw AS (
+                                SELECT f.tier, f.source, f.path, f.title, f.cwd, f.updated_at,
+                                       d.file_id, d.section, d.role, d.time, d.line, d.body,
+                                       bm25(docs_fts) AS rank
+                                FROM docs_fts
+                                JOIN docs d ON d.id = docs_fts.rowid
+                                JOIN files f ON f.id = d.file_id
+                                WHERE docs_fts MATCH ? {where_sql}
+                            ),
+                            ranked AS (
+                                SELECT *, ROW_NUMBER() OVER (PARTITION BY file_id ORDER BY rank, line) AS conv_rn
+                                FROM raw
+                            )
+                            SELECT * FROM ranked
+                            WHERE conv_rn <= ?
+                            ORDER BY (CASE WHEN tier = 'curated' THEN 0 ELSE 1 END), rank, updated_at DESC
+                            LIMIT ?
+                        """
+                        q_rows = conn.execute(quorum_sql, [quorum_q, *params, effective_per_conv, limit]).fetchall()
+                        seen_keys = {(r["path"], r["line"]) for r in rows}
+                        file_cnts: dict[str, int] = {}
+                        for r in rows:
+                            file_cnts[r["path"]] = file_cnts.get(r["path"], 0) + 1
+                        curated_added: list = []
+                        archive_added: list = []
+                        for qr in q_rows:
+                            k_id = (qr["path"], qr["line"])
+                            if k_id in seen_keys or file_cnts.get(qr["path"], 0) >= effective_per_conv:
+                                continue
+                            seen_keys.add(k_id)
+                            file_cnts[qr["path"]] = file_cnts.get(qr["path"], 0) + 1
+                            if qr["tier"] == "curated":
+                                curated_added.append(qr)
+                            else:
+                                archive_added.append(qr)
+                        # Place rescued curated notes right after strict-match curated notes, before archive hits
+                        strict_curated = [r for r in rows if r["tier"] == "curated"]
+                        strict_archive = [r for r in rows if r["tier"] != "curated"]
+                        rows = (strict_curated + curated_added + strict_archive + archive_added)[:limit]
                 # Rescue continuous unspaced natural-language sentences (>= 6 CJK chars) when exact phrase hits nothing
                 if not rows and len(terms) == 1:
                     cjk_only = "".join(re.findall(r"[\u4e00-\u9fff]+", terms[0]))
@@ -642,6 +712,7 @@ def rrf_fuse(fts_hits: list[dict], vec_hits: list[dict], limit: int, per_conv: i
     fused: dict[tuple[str, int], dict] = {}
     scores: dict[tuple[str, int], float] = {}
     vias: dict[tuple[str, int], set[str]] = {}
+    vec_sims: dict[tuple[str, int], float] = {}
 
     for rank, item in enumerate(fts_hits):
         key = (item["path"], int(item["line"]))
@@ -654,11 +725,19 @@ def rrf_fuse(fts_hits: list[dict], vec_hits: list[dict], limit: int, per_conv: i
         fused.setdefault(key, dict(item))
         scores[key] = scores.get(key, 0.0) + 1.0 / (40.0 + rank)
         vias.setdefault(key, set()).add("vector")
+        vec_sims[key] = float(item.get("score") or 0.0)
+
+    for key, item in fused.items():
+        if item.get("tier") == "curated":
+            if "fts" in vias[key] or vec_sims.get(key, 0.0) >= 0.58:
+                scores[key] += 0.015
+            elif vec_sims.get(key, 0.0) >= 0.48:
+                scores[key] += 0.004
 
     ranked = sorted(
         fused.items(),
         key=lambda kv: (
-            scores[kv[0]] + (0.015 if kv[1].get("tier") == "curated" else 0.0),
+            scores[kv[0]],
             kv[1].get("updated_at", ""),
         ),
         reverse=True,

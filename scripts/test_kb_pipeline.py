@@ -732,6 +732,11 @@ class TestHybridSearchAndMcp(unittest.TestCase):
             self.assertTrue(hits)
             self.assertIn("省略号", hits[0]["snippet"])
 
+            # Multi-keyword quorum ((N-1)-of-N AND) rescues curated note matching 2 of 3 keywords
+            quorum_hits = kb_search.search_kb(root, "动态文本 省略号 不存在的第三词", mode="fts", limit=3)
+            self.assertTrue(quorum_hits)
+            self.assertEqual(quorum_hits[0]["path"], "个人档案.md")
+
             # RRF fusion prioritizes items found in both FTS and Vector rankings
             fused = kb_search.rrf_fuse(
                 [{"path": "a.md", "line": 1, "tier": "archive", "updated_at": "2026-11-01"}, {"path": "b.md", "line": 1, "tier": "archive", "updated_at": "2026-11-02"}],
@@ -741,7 +746,7 @@ class TestHybridSearchAndMcp(unittest.TestCase):
             self.assertEqual(fused[0]["path"], "b.md")
             self.assertEqual(fused[0]["match_via"], "fts+vector")
 
-            # Verify MCP server read tools & path traversal guard using Python 3.11 runtime
+            # Verify MCP server read tools, section jump & path traversal guard using Python 3.11 runtime
             py311 = Path("/usr/local/bin/python3")
             if py311.is_file():
                 script = (
@@ -750,7 +755,7 @@ class TestHybridSearchAndMcp(unittest.TestCase):
                     f"r = Path({str(root)!r}); "
                     "ov = kb_mcp.kb_overview_data(r); assert ov['guardrails'] == ['1. 先读原文。']; "
                     "ctx = kb_mcp.kb_project_context_data('/Users/dev/chat-app', r); assert len(ctx['project_sections']) == 1; "
-                    "rd = kb_mcp.kb_read_note_data('INDEX.md', root=r); assert '# 索引' in rd['content']; "
+                    "rd = kb_mcp.kb_read_note_data('个人档案.md', section='前端实现约定', root=r); assert rd['start_line'] == 3; "
                     "ok_block = False\n"
                     "try:\n kb_mcp.kb_read_note_data('../../etc/passwd', root=r)\n"
                     "except ValueError:\n ok_block = True\n"

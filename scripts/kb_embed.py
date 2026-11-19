@@ -15,6 +15,8 @@ import re
 import sqlite3
 import sys
 
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 try:
     import numpy as np
     import onnxruntime as ort
@@ -28,6 +30,7 @@ DEFAULT_MODEL_DIR = Path.home() / ".cache" / "magpie" / "paraphrase-multilingual
 EMBED_DIM = 384
 MAX_CHUNKS_PER_ARCHIVE_CONV = 4
 VECTOR_SCHEMA_VERSION = "1"
+_VEC_CACHE: dict[str, tuple[int, list[tuple], "np.ndarray"]] = {}
 
 
 def _clean_for_embedding(raw: str) -> str:
@@ -36,11 +39,11 @@ def _clean_for_embedding(raw: str) -> str:
         txt = txt.split("## My request:", 1)[1].strip()
     txt = txt.replace("[非文本附件：保留在原始会话中，本次文本归档未复制附件。]", "").strip()
     txt = re.sub(r"\s+", " ", txt)
-    return txt[:420]
+    return txt[:800]
 
 
 class LocalOnnxEmbedder:
-    def __init__(self, model_dir: Path = DEFAULT_MODEL_DIR, max_length: int = 160):
+    def __init__(self, model_dir: Path = DEFAULT_MODEL_DIR, max_length: int = 256):
         self.model_dir = Path(model_dir)
         self.max_length = max_length
         self._tok = None
@@ -290,40 +293,53 @@ def query_vectors(
     else:
         qvec = np.asarray(encode_fn([query])[0], dtype=np.float32)
 
-    where = []
-    params: list = []
-    if source == "notes":
-        where.append("tier = 'curated'")
-    elif source != "all":
-        where.append("source = ?")
-        params.append(source)
-    if role != "all":
-        where.append("role = ?")
-        params.append(role)
-    if cwd:
-        where.append("LOWER(cwd) LIKE ?")
-        params.append(f"%{cwd.lower()}%")
-    if since:
-        where.append("(tier = 'curated' OR substr(updated_at, 1, 10) >= ?)")
-        params.append(since)
+    cache_key = str(vec_db)
+    mtime_ns = vec_db.stat().st_mtime_ns
+    cached = _VEC_CACHE.get(cache_key)
+    if cached is not None and cached[0] == mtime_ns:
+        all_meta, full_mat = cached[1], cached[2]
+    else:
+        v_conn = sqlite3.connect(vec_db.resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0)
+        try:
+            raw_rows = v_conn.execute(
+                "SELECT doc_id, path, tier, source, role, cwd, updated_at, dim, vec FROM doc_vecs"
+            ).fetchall()
+        finally:
+            v_conn.close()
+        if not raw_rows:
+            return []
+        all_meta = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]) for r in raw_rows]
+        full_mat = np.vstack([np.frombuffer(r[8], dtype=np.float16).astype(np.float32) for r in raw_rows])
+        _VEC_CACHE[cache_key] = (mtime_ns, all_meta, full_mat)
 
-    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-    v_conn = sqlite3.connect(vec_db.resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0)
-    try:
-        rows = v_conn.execute(
-            f"SELECT doc_id, path, tier, source, role, cwd, updated_at, dim, vec FROM doc_vecs {where_sql}",
-            params,
-        ).fetchall()
-    finally:
-        v_conn.close()
-
-    if not rows:
+    if not all_meta or full_mat.shape[1] != qvec.shape[0]:
         return []
 
-    dim = rows[0][7]
-    mat = np.vstack([np.frombuffer(r[8], dtype=np.float16).astype(np.float32) for r in rows])
-    if mat.shape[1] != qvec.shape[0]:
-        return []
+    cwd_low = cwd.lower() if cwd else ""
+    if source == "all" and role == "all" and not cwd_low and not since:
+        rows = all_meta
+        mat = full_mat
+    else:
+        keep_idx = []
+        rows = []
+        for i, m in enumerate(all_meta):
+            _, _, tier, src, d_role, d_cwd, upd, _ = m
+            if source == "notes" and tier != "curated":
+                continue
+            if source not in ("all", "notes") and src != source:
+                continue
+            if role != "all" and d_role != role:
+                continue
+            if cwd_low and cwd_low not in (d_cwd or "").lower():
+                continue
+            if since and tier != "curated" and (upd or "")[:10] < since:
+                continue
+            keep_idx.append(i)
+            rows.append(m)
+        if not rows:
+            return []
+        mat = full_mat[keep_idx]
+
     sims = mat @ qvec.astype(np.float32)
     order = np.argsort(-sims)
 
@@ -338,7 +354,7 @@ def query_vectors(
             sim = float(sims[idx])
             if sim <= 0.15:
                 break
-            doc_id, path, tier, src, d_role, d_cwd, upd, _, _ = rows[idx]
+            doc_id, path, tier, src, d_role, d_cwd, upd, _ = rows[idx]
             if conv_counts.get(path, 0) >= eff_per_conv:
                 continue
             drow = s_conn.execute(
@@ -377,6 +393,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Local ONNX vector indexer & semantic search helper.")
     parser.add_argument("--root", type=Path, default=Path(os.environ.get("AGENT_MEMORY_KB_ROOT", Path.home() / "personal-kb")))
     parser.add_argument("--sync", action="store_true")
+    parser.add_argument("--stats", action="store_true")
     parser.add_argument("--query", "-q", default="")
     parser.add_argument("--source", default="all")
     parser.add_argument("--role", default="all")

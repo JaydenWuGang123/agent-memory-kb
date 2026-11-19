@@ -3,12 +3,28 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 
-from mcp.server.fastmcp import FastMCP
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+try:
+    from mcp.server.fastmcp import FastMCP
+except ImportError:  # pragma: no cover - allow importing data helpers on runtimes without mcp
+    class FastMCP:  # type: ignore[no-redef]
+        def __init__(self, name: str):
+            self.name = name
+
+        def tool(self):
+            def _decorator(fn):
+                return fn
+            return _decorator
+
+        def run(self, transport: str = "stdio"):
+            raise RuntimeError("mcp package is not installed in this Python interpreter")
 
 SYNC_DIR = Path(__file__).resolve().parent
 DEFAULT_KB_ROOT = SYNC_DIR.parent
@@ -42,6 +58,12 @@ def _fts_via_sys_python(
     limit: int,
     per_conv: int = 2,
 ) -> list[dict]:
+    db_path = root / "_同步" / "search_index.sqlite"
+    if db_path.is_file():
+        try:
+            return kb_search._search_via_sqlite(root, db_path, query, source, role, cwd, since, limit, per_conv)
+        except Exception:
+            pass
     cmd = [
         SYS_PYTHON,
         str(SYNC_DIR / "kb_search.py"),
@@ -161,22 +183,42 @@ def kb_project_context_data(
 ) -> dict:
     root = root.resolve()
     key = Path(cwd_or_project).name.lower() if "/" in cwd_or_project else cwd_or_project.strip().lower()
+    syn_map = kb_search.load_synonyms(root)
+    key_variants = list(dict.fromkeys([key] + [v.lower() for v in kb_search.expand_term_variants(key, syn_map)])) if key else []
     proj_file = root / "笔记" / "进行中的项目.md"
     git_rows: list[str] = []
     matched_sections: list[str] = []
 
-    if proj_file.is_file() and key:
+    if proj_file.is_file() and key_variants:
         text = proj_file.read_text(encoding="utf-8", errors="replace")
         for line in text.splitlines():
-            if line.startswith("| `") and key in line.lower():
+            low_ln = line.lower()
+            if line.startswith("| `") and any(kv in low_ln for kv in key_variants):
                 git_rows.append(line)
+            elif line.startswith("| **") and any(kv in low_ln for kv in key_variants):
+                matched_sections.append(line.strip())
         for sec in re.split(r"(?=^###\s+)", text, flags=re.M):
-            if sec.startswith("### ") and key in sec.lower():
+            if sec.startswith("### ") and any(kv in sec.lower() for kv in key_variants):
                 matched_sections.append(sec.strip())
 
     recent_res: list[dict] = []
     if key and (include_recent or not matched_sections):
-        recent_res = _fts_via_sys_python(root, key or cwd_or_project, "all", "all", key, "", 4, 1)
+        for kv in key_variants:
+            hits = _fts_via_sys_python(root, kv, "all", "all", kv, "", 4, 1)
+            for h in hits:
+                if (h.get("path"), h.get("line")) not in {(r.get("path"), r.get("line")) for r in recent_res}:
+                    recent_res.append(h)
+            if len(recent_res) >= 4:
+                break
+        if len(recent_res) < 2:
+            broad_hits = _fts_via_sys_python(root, key, "all", "all", "", "", 4, 1)
+            seen = {(r.get("path"), r.get("line")) for r in recent_res}
+            for h in broad_hits:
+                if (h.get("path"), h.get("line")) not in seen:
+                    recent_res.append(h)
+                    seen.add((h.get("path"), h.get("line")))
+                if len(recent_res) >= 4:
+                    break
         if not recent_res:
             recent_res = kb_search_data(key, mode="hybrid", limit=4, per_conv=1, root=root).get("results", [])
 
@@ -189,7 +231,7 @@ def kb_project_context_data(
     if recent_res:
         payload["recent_hits"] = _trim_hits(recent_res[:4])
     payload["next_hop_hint"] = (
-        "Call kb_read_note(rel_path, start_line, max_lines) to inspect any matched note or conversation in full, "
+        "Call kb_read_note(rel_path, start_line, max_lines, section) to inspect any matched note or conversation in full, "
         "or kb_search_query(query) to search deeper across all 5 archived AI sources."
     )
     return payload
@@ -217,7 +259,13 @@ def kb_mistakes_data(
     return payload
 
 
-def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 160, root: Path = DEFAULT_KB_ROOT) -> dict:
+def kb_read_note_data(
+    rel_path: str,
+    start_line: int = 1,
+    max_lines: int = 160,
+    section: str = "",
+    root: Path = DEFAULT_KB_ROOT,
+) -> dict:
     root = root.resolve()
     raw = (rel_path or "").strip().lstrip("/")
     target = (root / raw).resolve()
@@ -229,6 +277,20 @@ def kb_read_note_data(rel_path: str, start_line: int = 1, max_lines: int = 160, 
         raise FileNotFoundError(f"KB note not found: {rel_clean}")
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
     s_idx = max(1, int(start_line))
+    sec_q = (section or "").lstrip("#").strip().lower()
+    if sec_q and s_idx == 1:
+        matched_line = 0
+        for idx, ln in enumerate(lines, 1):
+            if ln.startswith("#") and sec_q in ln.lstrip("#").strip().lower():
+                matched_line = idx
+                break
+        if not matched_line:
+            for idx, ln in enumerate(lines, 1):
+                if sec_q in ln.lower():
+                    matched_line = idx
+                    break
+        if matched_line:
+            s_idx = matched_line
     e_idx = min(len(lines), s_idx + max(1, min(400, int(max_lines))) - 1)
     sliced = [f"{i}: {lines[i - 1]}" for i in range(s_idx, e_idx + 1)]
     return {
@@ -280,11 +342,11 @@ def kb_mistakes_and_guardrails(include_pending: bool = True, full_book: bool = T
 
 
 @mcp.tool()
-def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 160) -> str:
+def kb_read_note(rel_path: str, start_line: int = 1, max_lines: int = 160, section: str = "") -> str:
     """WHEN TO USE: Call to read a specific living note (e.g. '笔记/进行中的项目.md', '笔记/财富与投资纪律.md') or an archived conversation file returned by kb_search_query.
-    ARGS: rel_path (path relative to KB root), start_line (1-based), max_lines (default 160, max 400).
+    ARGS: rel_path (path relative to KB root), start_line (1-based), max_lines (default 160, max 400), section (optional heading or keyword to jump directly to).
     RETURNS: Line-numbered plain text strictly confined inside the KB root."""
-    d = kb_read_note_data(rel_path=rel_path, start_line=start_line, max_lines=max_lines)
+    d = kb_read_note_data(rel_path=rel_path, start_line=start_line, max_lines=max_lines, section=section)
     return f"# {d['path']} (lines {d['start_line']}-{d['end_line']}/{d['total_lines']})\n{d['content']}"
 
 
