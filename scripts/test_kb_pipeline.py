@@ -580,9 +580,15 @@ class TestRemainingFourExporters(unittest.TestCase):
             st = sqlite3.connect(str(codex_home / "state_5.sqlite"))
             st.execute("CREATE TABLE threads (id TEXT, title TEXT, cwd TEXT, source TEXT, thread_source TEXT, rollout_path TEXT, created_at INTEGER, updated_at INTEGER, archived INTEGER)")
             st.execute("INSERT INTO threads VALUES ('th-1', '排查登录', '/Users/dev/app', 'cli', 'user', ?, 1795000000, 1795000100, 0)", (str(rollout),))
+            st.execute("INSERT INTO threads VALUES ('th-remote', '别人电脑的电商设计', 'C:\\Users\\other\\design', 'cli', 'user', ?, 1795000000, 1795000100, 0)", (str(rollout),))
             st.execute("INSERT INTO threads VALUES ('th-sub', 'subagent', '/Users/dev/app', 'sub', 'subagent', ?, 1795000000, 1795000100, 0)", (str(rollout),))
             st.commit()
             st.close()
+            (root / "_同步").mkdir(parents=True, exist_ok=True)
+            (root / "_同步" / "kb_config.json").write_text(
+                json.dumps({"noise_filter": {"allowed_cwd_prefixes": ["/Users/dev"]}}),
+                encoding="utf-8",
+            )
 
             hist = sqlite3.connect(str(codex_home / "thread_history_1.sqlite"))
             hist.execute("CREATE TABLE thread_items (thread_id TEXT, item_json TEXT, item_id TEXT, turn_id TEXT, created_at_ms INTEGER, rollout_ordinal INTEGER, item_type TEXT)")

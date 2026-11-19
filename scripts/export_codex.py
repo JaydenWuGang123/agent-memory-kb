@@ -219,6 +219,12 @@ def main():
     noise_cfg = load_noise_filter(output)
     excluded_uids = set(noise_cfg.get("excluded_codex_user_ids") or [])
     excluded_aids = set(noise_cfg.get("excluded_codex_account_ids") or [])
+    excluded_sources = set(noise_cfg.get("excluded_thread_sources") or [])
+    allowed_cwd_prefixes = [
+        p.replace("\\", "/").rstrip("/").lower()
+        for p in (noise_cfg.get("allowed_cwd_prefixes") or [])
+        if isinstance(p, str) and p.strip()
+    ]
     changed = skipped = missing = pruned_noise = 0
     for thread in threads:
         thread_id = thread["id"]
@@ -227,7 +233,14 @@ def main():
         target = output / relative
         t_uid = thread["creator_user_id"] if "creator_user_id" in cols else None
         t_aid = thread["creator_account_id"] if "creator_account_id" in cols else None
-        if (t_uid and t_uid in excluded_uids) or (t_aid and t_aid in excluded_aids):
+        t_src = thread["thread_source"] or ""
+        t_cwd_norm = (thread["cwd"] or "").replace("\\", "/").strip().lower()
+        cwd_blocked = bool(
+            allowed_cwd_prefixes
+            and t_cwd_norm
+            and not any(t_cwd_norm == pref or t_cwd_norm.startswith(pref + "/") for pref in allowed_cwd_prefixes)
+        )
+        if (t_uid and t_uid in excluded_uids) or (t_aid and t_aid in excluded_aids) or (t_src in excluded_sources) or cwd_blocked:
             previous.pop(thread_id, None)
             target.unlink(missing_ok=True)
             pruned_noise += 1
