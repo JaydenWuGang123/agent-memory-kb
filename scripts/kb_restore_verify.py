@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from zoneinfo import ZoneInfo
+
+CST_TZ = timezone(timedelta(hours=8), "CST")
 
 SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
@@ -132,7 +133,7 @@ def verify_restore(
 ) -> dict:
     """Clone local bundle into an isolated temp directory and verify full integrity."""
     root = root.resolve()
-    now = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z")
+    now = datetime.now(CST_TZ).strftime("%Y-%m-%d %H:%M:%S %Z")
     if not bundle_path.is_file():
         return {"ok": False, "verified_at": now, "error": f"本地备份包不存在: {bundle_path}"}
 

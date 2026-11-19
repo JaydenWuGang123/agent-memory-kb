@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
 import re
 import sys
 from urllib.parse import unquote
-from zoneinfo import ZoneInfo
+
+CST_TZ = timezone(timedelta(hours=8), "CST")
 
 SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
@@ -210,7 +211,7 @@ def check_archive_secrets(root: Path) -> list[dict]:
 
 def check_staleness(root: Path, max_age_days: int = 14, today: date | None = None) -> list[dict]:
     """Flag living L3 notes or tracked pending states whose latest confirmation date exceeds max_age_days."""
-    ref_today = today or datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    ref_today = today or datetime.now(CST_TZ).date()
     stale: list[dict] = []
     targets = [
         "笔记/进行中的项目.md",

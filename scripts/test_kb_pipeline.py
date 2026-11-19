@@ -329,7 +329,8 @@ class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
             self.assertNotIn("secret", md)
 
     def test_pipeline_git_bundle_verify_idempotency_and_precommit_hook(self):
-        with tempfile.TemporaryDirectory() as td:
+        td_kwargs = {"ignore_cleanup_errors": True} if sys.version_info >= (3, 10) else {}
+        with tempfile.TemporaryDirectory(**td_kwargs) as td:
             root = Path(td)
             subprocess.run(["git", "init", "-b", "main", str(root)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.com"], check=True)
@@ -460,7 +461,7 @@ class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
             self.assertEqual(remote_head, local_head)
 
             # Verify --skip-repo-probe / --skip-icloud / --skip-private-remote stay completely idempotent after full sync
-            with tempfile.TemporaryDirectory() as repo_td:
+            with tempfile.TemporaryDirectory(**td_kwargs) as repo_td:
                 repo_dir = Path(repo_td) / "app"
                 subprocess.run(["git", "init", "-b", "main", str(repo_dir)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["git", "-C", str(repo_dir), "config", "user.email", "t@e.com"], check=True)

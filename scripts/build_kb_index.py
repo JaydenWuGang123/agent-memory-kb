@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -13,7 +13,8 @@ import re
 import sqlite3
 import subprocess
 import sys
-from zoneinfo import ZoneInfo
+
+CST_TZ = timezone(timedelta(hours=8), 'CST')
 
 from kb_backup import (  # noqa: F401 - re-exported for test/CLI compatibility
     DEFAULT_BUNDLE_BACKUP_PATH,
@@ -167,7 +168,7 @@ def auto_archive_profile_if_needed(root: Path, threshold_lines: int) -> dict | N
     line_cnt = len(profile_path.read_text(encoding='utf-8', errors='replace').splitlines())
     if line_cnt <= threshold_lines:
         return None
-    before_month = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m')
+    before_month = datetime.now(CST_TZ).strftime('%Y-%m')
     res = archive_profile(root, before_month)
     return res if res.get('archived_sections', 0) > 0 else None
 
@@ -464,10 +465,10 @@ def run_pipeline(args) -> dict:
     preserved_heartbeat = extract_codex_heartbeat_block(report_path)
 
     if prev_sig_data.get('signature') == state_sig and (root / 'README.md').is_file() and (root / '对话索引.md').is_file() and report_path.is_file():
-        now = prev_sig_data.get('timestamp') or datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S %Z')
+        now = prev_sig_data.get('timestamp') or datetime.now(CST_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
         changed_state = False
     else:
-        now = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S %Z')
+        now = datetime.now(CST_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
         changed_state = True
 
     def table(items, prefix=''):
@@ -543,7 +544,7 @@ def run_pipeline(args) -> dict:
         diff_res = subprocess.run(['git', '-C', str(root), 'diff', '--cached', '--quiet'], check=False)
         committed = False
         if diff_res.returncode != 0:
-            commit_ts = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S %Z')
+            commit_ts = datetime.now(CST_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
             commit_res = subprocess.run(
                 ['git', '-C', str(root), 'commit', '-m', f'chore(kb): auto snapshot ({commit_ts})'],
                 capture_output=True, text=True, check=False
@@ -624,7 +625,7 @@ def run_pipeline(args) -> dict:
             pipeline_state['icloud_encrypted'] = icloud_encrypted
             if icloud_synced:
                 pipeline_state['icloud_consecutive_failures'] = 0
-                pipeline_state['last_icloud_success_at'] = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S %Z')
+                pipeline_state['last_icloud_success_at'] = datetime.now(CST_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
             else:
                 pipeline_state['icloud_consecutive_failures'] = int(pipeline_state.get('icloud_consecutive_failures', 0)) + 1
 
@@ -643,7 +644,7 @@ def run_pipeline(args) -> dict:
                 pipeline_state['private_remote_note'] = private_remote_note
                 if pr_ok:
                     pipeline_state['private_remote_head'] = cur_head
-                    pipeline_state['private_remote_pushed_at'] = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S %Z')
+                    pipeline_state['private_remote_pushed_at'] = datetime.now(CST_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
 
         _sync_private_remote()
         post_remote_state_key = f"{remote_cfg_key}:{'ok' if pipeline_state.get('private_remote_ok') is True else ('fail' if pipeline_state.get('private_remote_ok') is False else 'pending')}"
@@ -708,7 +709,7 @@ def run_pipeline(args) -> dict:
                 preserved_heartbeat, pending, limits,
             )
 
-    pipeline_state['last_run_at'] = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    pipeline_state['last_run_at'] = datetime.now(CST_TZ).strftime('%Y-%m-%d %H:%M:%S %Z')
     pipeline_state['doctor_healthy'] = doctor_res['healthy']
     maybe_notify_issues(
         cfg=cfg,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 try:
     import fcntl
 except ImportError:  # pragma: no cover - Windows lacks fcntl
@@ -20,7 +20,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from zoneinfo import ZoneInfo
+
+CST_TZ = timezone(timedelta(hours=8), 'CST')
 
 from kb_filters import atomic_write_text
 
@@ -85,6 +86,10 @@ def sync_lock(root: Path):
             finally:
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
         elif msvcrt is not None:  # pragma: no cover - Windows file locking
+            f.seek(0, os.SEEK_END)
+            if f.tell() == 0:
+                f.write(' ')
+                f.flush()
             f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
             try:
@@ -304,7 +309,7 @@ def describe_icloud_status(
     prev_failed = bool(prev_state and prev_state.get('icloud_synced') is False and prev_state.get('icloud_note'))
     if prev_failed and ic_mtime <= loc_mtime + 2.0:
         fails = prev_state.get('icloud_consecutive_failures', 1)
-        ic_ts = datetime.fromtimestamp(ic_mtime, ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M')
+        ic_ts = datetime.fromtimestamp(ic_mtime, CST_TZ).strftime('%Y-%m-%d %H:%M')
         return (
             f"**⚠️ 后台同步受阻**（连续 {fails} 次未同步：{prev_state['icloud_note']}；云盘副本停留在 `{ic_ts}`，滞后 {lag_hours:.1f} 小时，本地镜像已最新）{enc_tag}：`{actual_icloud}`",
             'blocked',

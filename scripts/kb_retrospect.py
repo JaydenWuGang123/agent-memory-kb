@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
 import re
 import sqlite3
 import sys
-from zoneinfo import ZoneInfo
+
+CST_TZ = timezone(timedelta(hours=8), "CST")
 
 SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
@@ -147,7 +148,7 @@ def scan_correction_candidates(
 
     candidates.sort(key=lambda item: (item["updated_at"], item["hit_count"]), reverse=True)
     return {
-        "updated_at": datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "updated_at": datetime.now(CST_TZ).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "total_detected": total_detected,
         "unresolved_count": len(candidates),
         "candidates": candidates,
@@ -245,7 +246,7 @@ def resolve_candidate(root: Path, path: str, note: str = "") -> dict:
         hit_count = max(2, int((queue.get("resolved", {}).get(rel) or {}).get("hit_count", 2)))
 
     queue.setdefault("resolved", {})[rel] = {
-        "resolved_at": datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "resolved_at": datetime.now(CST_TZ).strftime("%Y-%m-%d %H:%M:%S %Z"),
         "hit_count": hit_count,
         "updated_at": upd_at,
         "note": note,
