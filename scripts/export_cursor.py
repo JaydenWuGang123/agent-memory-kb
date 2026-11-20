@@ -22,7 +22,7 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import atomic_write_text, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
+from kb_filters import archive_path, atomic_write_text, write_manifest, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
 
 VERSION = 2
 
@@ -175,7 +175,7 @@ def main():
         signature = hashlib.sha256(
             json.dumps([VERSION, cid, name, updated_at, len(headers), cwd], ensure_ascii=False).encode()
         ).hexdigest()
-        relative = f"对话/Cursor/{cid}.md"
+        relative = archive_path(output, "Cursor", cid).as_posix()
         target = output / relative
 
         if not args.force and previous.get(cid, {}).get("source_signature") == signature and target.exists():
@@ -263,10 +263,7 @@ def main():
         changed += 1
 
     conn.close()
-    atomic_write_text(
-        manifest_path,
-        json.dumps(sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True), ensure_ascii=False, indent=2) + "\n",
-    )
+    write_manifest(manifest_path, sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True))
     print(json.dumps({
         "written": changed,
         "unchanged": skipped,

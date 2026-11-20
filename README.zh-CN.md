@@ -80,6 +80,13 @@ pip install -r requirements.txt
 
 参照 [`examples/mcp_config.example.json`](examples/mcp_config.example.json) 将 `~/personal-kb/_同步/kb_mcp.py` 注册进 **Codex / Cursor / Claude Code / Antigravity**，并将 [`examples/agent-rules.md`](examples/agent-rules.md) 放入全局 Agent 规则（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`）。
 
+在 macOS 或 Linux 上，从需要接入的项目目录运行下面的命令。请使用已安装 MCP 依赖的 Python 解释器，然后在 Claude Code 中用 `/mcp` 检查连接，让 Claude 调用 `kb_overview` 核对知识库。
+
+```sh
+claude mcp add --scope local --transport stdio personal-kb -- python3 "$HOME/personal-kb/_同步/kb_mcp.py"
+```
+
+
 ### 4. 开启跨平台定时同步（macOS / Linux / Windows）与手机端加密同步（可选）
 
 - **macOS（`launchd` + 钥匙串 AES-256 iCloud 容灾）**：[`examples/personal-kb-sync.sh.example`](examples/personal-kb-sync.sh.example) 与 [`examples/launchd.personal-kb-sync.plist.example`](examples/launchd.personal-kb-sync.plist.example)。

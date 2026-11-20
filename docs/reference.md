@@ -23,7 +23,7 @@ After running `python3 init_kb.py --root ~/personal-kb`:
 │   ├── Codex/
 │   ├── Cursor/
 │   ├── Antigravity/
-│   ├── ClaudeCode/
+│   ├── Claude/
 │   └── ChatGPT/
 ├── 共享摘录/                       # Tier 3 public sanitized zone (enforced by kb_doctor)
 └── _同步/                          # All 16 scripts, SQLite index, and sync reports

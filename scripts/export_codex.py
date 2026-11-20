@@ -20,7 +20,7 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import atomic_write_text, clean_ide_prompt, load_noise_filter, redact_secrets, should_skip_conversation, should_skip_exported_markdown  # noqa: E402
+from kb_filters import archive_path, atomic_write_text, write_manifest, clean_ide_prompt, load_noise_filter, redact_secrets, should_skip_conversation, should_skip_exported_markdown  # noqa: E402
 
 VERSION = 3
 VISIBLE_PHASES = {None, "commentary", "final", "final_answer"}
@@ -229,7 +229,7 @@ def main():
     for thread in threads:
         thread_id = thread["id"]
         source = Path(thread["rollout_path"])
-        relative = f"对话/Codex/{thread_id}.md"
+        relative = archive_path(output, "Codex", thread_id).as_posix()
         target = output / relative
         t_uid = thread["creator_user_id"] if "creator_user_id" in cols else None
         t_aid = thread["creator_account_id"] if "creator_account_id" in cols else None
@@ -324,10 +324,7 @@ def main():
             "attachment_count": attachments, "method": method, "source_signature": signature,
         }
         changed += 1
-    atomic_write_text(
-        manifest_path,
-        json.dumps(sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True), ensure_ascii=False, indent=2) + "\n",
-    )
+    write_manifest(manifest_path, sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True))
     state.close()
     history.close()
     print(json.dumps({"source_threads": len(all_threads), "eligible_threads": len(threads),

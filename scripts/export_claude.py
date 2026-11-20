@@ -18,9 +18,9 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import atomic_write_text, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
+from kb_filters import archive_path, atomic_write_text, write_manifest, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
 
-VERSION = 3
+VERSION = 4
 
 
 def clean_user_text(raw: str) -> str:
@@ -47,7 +47,7 @@ def extract_blocks(content) -> tuple[str, int, bool]:
         if not isinstance(block, dict):
             continue
         btype = block.get("type")
-        if btype == "text":
+        if btype == "text" and isinstance(block.get("text"), str):
             txt = clean_user_text(block.get("text") or "")
             if txt.startswith("Base directory for this skill:"):
                 saw_tool_or_thinking = True
@@ -83,7 +83,7 @@ def parse_session(jsonl_path: Path):
                 limitations.append("原始会话存在尚未写完整或无法解析的记录；下次同步会重试。")
                 continue
 
-            if rec.get("isSidechain"):
+            if not isinstance(rec, dict) or rec.get("isSidechain") or rec.get("isMeta"):
                 continue
 
             ts = rec.get("timestamp")
@@ -100,6 +100,8 @@ def parse_session(jsonl_path: Path):
                 continue
 
             msg = rec.get("message") or {}
+            if not isinstance(msg, dict):
+                continue
             text, imgs, _ = extract_blocks(msg.get("content"))
             if not text:
                 continue
@@ -191,7 +193,7 @@ def main():
             signature = hashlib.sha256(
                 json.dumps([VERSION, sid, stat.st_size, stat.st_mtime_ns], ensure_ascii=False).encode()
             ).hexdigest()
-            relative = f"对话/Claude/{sid}.md"
+            relative = archive_path(output, "Claude", sid).as_posix()
             target = output / relative
             if not args.force and previous.get(sid, {}).get("source_signature") == signature and target.exists():
                 skipped += 1
@@ -230,10 +232,7 @@ def main():
             }
             changed += 1
 
-    atomic_write_text(
-        manifest_path,
-        json.dumps(sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True), ensure_ascii=False, indent=2) + "\n",
-    )
+    write_manifest(manifest_path, sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True))
     print(json.dumps({
         "written": changed,
         "unchanged": skipped,

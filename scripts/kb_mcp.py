@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover - allow importing data helpers on runtim
             raise RuntimeError("mcp package is not installed in this Python interpreter")
 
 SYNC_DIR = Path(__file__).resolve().parent
-DEFAULT_KB_ROOT = SYNC_DIR.parent
+DEFAULT_KB_ROOT = Path(os.environ.get("AGENT_MEMORY_KB_ROOT") or SYNC_DIR.parent).expanduser().resolve()
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
@@ -151,7 +151,7 @@ def kb_search_data(
     if mode in ("hybrid", "fts") or is_regex:
         fts_hits = _fts_via_sys_python(
             root, query, source, role, cwd, since,
-            limit if (mode == "fts" or is_regex) else max(24, eff_limit * 3),
+            eff_limit if (mode == "fts" or is_regex) else max(24, eff_limit * 3),
             eff_per_conv,
         )
     if mode == "fts" or is_regex:
@@ -190,23 +190,20 @@ def kb_project_context_data(
     git_rows: list[str] = []
     matched_sections: list[str] = []
 
+    known_projects = set()
     if proj_file.is_file() and key_variants:
         text = proj_file.read_text(encoding="utf-8", errors="replace")
         for line in text.splitlines():
             low_ln = line.lower()
-            if line.startswith("| `") and any(kv in low_ln for kv in key_variants):
-                git_rows.append(line)
+            if line.startswith("| `"):
+                known_projects.add(low_ln.split("`", 2)[1])
+                if any(kv in low_ln for kv in key_variants):
+                    git_rows.append(line)
             elif line.startswith("| **") and any(kv in low_ln for kv in key_variants):
                 matched_sections.append(line.strip())
         for sec in re.split(r"(?=^###\s+)", text, flags=re.M):
             if sec.startswith("### ") and any(kv in sec.lower() for kv in key_variants):
                 matched_sections.append(sec.strip())
-
-    known_projects = (
-        "employee-web-wx", "hr-agent-h5", "salary-web-pc", "openxsb-web",
-        "iit", "frontend-design-doc", "xtolls", "xtools", "etf-watch-mac",
-        "agent-memory-kb", "personal-kb", "expense-learning",
-    )
 
     def _is_valid_project_chat_hit(h: dict) -> bool:
         if h.get("source") == "note" or h.get("tier") == "curated":
@@ -222,7 +219,7 @@ def kb_project_context_data(
         if h_cwd and not title_matches_key:
             h_cwd_norm = h_cwd.replace("\\", "/").rstrip("/")
             cwd_slug = h_cwd_norm.rsplit("/", 1)[-1].lower() if "/" in h_cwd_norm else h_cwd_norm.lower()
-            if cwd_slug not in ("", "wugang", "工作", "个人") and not any(kv in h_cwd_norm.lower() for kv in key_variants):
+            if cwd_slug not in ("", Path.home().name.lower(), "工作", "个人") and not any(kv in h_cwd_norm.lower() for kv in key_variants):
                 return False
         # Rule B: Exclude cross-project overview/inventory dumps that list many unrelated projects
         if not title_matches_key:
@@ -235,7 +232,7 @@ def kb_project_context_data(
         return True
 
     recent_res: list[dict] = []
-    if key and (include_recent or not matched_sections):
+    if key and include_recent:
         seen_paths: set[str] = set()
         for kv in key_variants:
             hits = _fts_via_sys_python(root, kv, "all", "all", kv, "", 12, 2)
@@ -320,6 +317,8 @@ def kb_read_note_data(
         rel_clean = target.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError(f"Access denied: path outside KB root ({rel_path})") from exc
+    if target.suffix.lower() != ".md" or any(part.startswith(".") for part in target.relative_to(root).parts):
+        raise ValueError("Only Markdown notes outside hidden directories are readable")
     if not target.is_file():
         raise FileNotFoundError(f"KB note not found: {rel_clean}")
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -376,7 +375,7 @@ def kb_search_query(
 
 @mcp.tool()
 def kb_project_context(cwd_or_project: str, include_recent: bool = True) -> str:
-    """WHEN TO USE: Call when starting or resuming work on a specific repository or project (pass the workspace directory name or project slug, e.g. 'employee-web-wx', 'salary-web-pc', 'xtolls').
+    """WHEN TO USE: Call when starting or resuming work on a specific repository or project (pass the workspace directory name or project slug, e.g. 'my-app').
     RETURNS: Live Git branch/dirty probe rows, curated project breakpoints (confirmed contracts, verification boundaries, next steps), and top 4 recent archived conversation hits for that project."""
     return _compact_json(kb_project_context_data(cwd_or_project, include_recent=include_recent))
 

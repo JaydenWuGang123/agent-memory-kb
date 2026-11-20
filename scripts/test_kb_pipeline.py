@@ -303,6 +303,14 @@ class TestArchiveProfile(unittest.TestCase):
 
 
 class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
+    def test_archive_path_requires_a_single_component(self):
+        from kb_filters import archive_path
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.assertEqual(archive_path(root, "Claude", "session-1").name, "session-1.md")
+            with self.assertRaises(ValueError):
+                archive_path(root, "Claude", "../other")
+
     def test_claude_export_filters_thinking_and_tool_blocks(self):
         with tempfile.TemporaryDirectory() as td:
             claude_dir = Path(td) / "projects" / "proj-a"
@@ -310,8 +318,9 @@ class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
             out_dir = Path(td) / "kb"
             jsonl = claude_dir / "sess-1.jsonl"
             records = [
+                {"type": "user", "isMeta": True, "message": {"content": "injected context"}},
                 {"type": "user", "cwd": "/Users/dev/test", "timestamp": "2026-11-18T01:00:00Z",
-                 "message": {"role": "user", "content": [{"type": "text", "text": "<ide_opened_file>foo</ide_opened_file>"}, {"type": "text", "text": "排查弹窗问题"}]}},
+                 "message": {"role": "user", "content": [{"type": "text", "text": "<ide_opened_file>foo</ide_opened_file>"}, {"type": "text", "text": "排查弹窗问题 sk-" + "a" * 30}]}},
                 {"type": "assistant", "timestamp": "2026-11-18T01:00:05Z",
                  "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": "secret"}, {"type": "tool_use", "name": "bash"}, {"type": "text", "text": "已定位弹窗根因。"}]}},
             ]
@@ -327,6 +336,15 @@ class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
             self.assertIn("排查弹窗问题", md)
             self.assertIn("已定位弹窗根因。", md)
             self.assertNotIn("secret", md)
+            self.assertNotIn("injected context", md)
+            manifest = out_dir / "_同步" / "claude-manifest.json"
+            entries = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertNotIn("a" * 30, entries[0]["title"])
+            entries[0]["title"] = "cached sk-" + "a" * 30
+            manifest.write_text(json.dumps(entries), encoding="utf-8")
+            second = subprocess.run(res.args, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(second.stdout)["unchanged"], 1)
+            self.assertNotIn("a" * 30, manifest.read_text(encoding="utf-8"))
 
     def test_pipeline_git_bundle_verify_idempotency_and_precommit_hook(self):
         td_kwargs = {"ignore_cleanup_errors": True} if sys.version_info >= (3, 10) else {}
@@ -762,7 +780,7 @@ class TestHybridSearchAndMcp(unittest.TestCase):
                 "import json, sys; from pathlib import Path; "
                 f"sys.path.insert(0, {str(SYNC_DIR)!r}); import kb_mcp; "
                 f"r = Path({str(root)!r}); "
-                "ov = kb_mcp.kb_overview_data(r); assert ov['guardrails'] == ['1. 先读原文。']; "
+                "ov = kb_mcp.kb_overview_data(); assert ov['guardrails'] == ['1. 先读原文。']; "
                 "ctx = kb_mcp.kb_project_context_data('/Users/dev/chat-app', r); assert len(ctx['project_sections']) == 1; "
                 "ctx_win = kb_mcp.kb_project_context_data(r'C:\\Users\\dev\\chat-app', r); assert len(ctx_win['project_sections']) == 1; "
                 "rd = kb_mcp.kb_read_note_data('个人档案.md', section='前端实现约定', root=r); assert rd['start_line'] == 3; "
@@ -771,7 +789,7 @@ class TestHybridSearchAndMcp(unittest.TestCase):
                 "except ValueError:\n ok_block = True\n"
                 "assert ok_block; print('MCP_OK')"
             )
-            out = subprocess.run([mcp_py, "-c", script], capture_output=True, text=True, encoding="utf-8", check=True)
+            out = subprocess.run([mcp_py, "-c", script], env={**os.environ, "AGENT_MEMORY_KB_ROOT": str(root)}, capture_output=True, text=True, encoding="utf-8", check=True)
             self.assertIn("MCP_OK", out.stdout)
 
 

@@ -68,6 +68,28 @@ DEFAULT_NOISE_FILTER = {
 }
 
 
+def archive_path(root: Path, source: str, session_id: str) -> Path:
+    """Construct a relative archive path for a single safe filename component."""
+    if not isinstance(session_id, str) or not re.fullmatch(r"[\w-][\w. -]*", session_id):
+        raise ValueError("Invalid archive session ID")
+    relative = Path("对话", source, session_id + ".md")
+    if (root / relative).resolve() != root.resolve() / relative:
+        raise ValueError("Archive path cannot follow symbolic links")
+    return relative
+
+
+def write_manifest(path: Path, entries) -> None:
+    """Apply the transcript redactor to display metadata, including cached entries."""
+    rows = []
+    for entry in entries:
+        row = entry.copy()
+        for key in ("title", "cwd"):
+            if isinstance(row.get(key), str):
+                row[key] = redact_secrets(row[key])
+        rows.append(row)
+    atomic_write_text(path, json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+
+
 def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
     """Atomically write text file via PID-scoped temp file + os.replace."""
     path.parent.mkdir(parents=True, exist_ok=True)

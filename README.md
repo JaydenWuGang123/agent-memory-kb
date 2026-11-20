@@ -80,6 +80,13 @@ pip install -r requirements.txt
 
 Register `~/personal-kb/_同步/kb_mcp.py` in Codex / Cursor / Claude Code / Antigravity using [`examples/mcp_config.example.json`](examples/mcp_config.example.json), and add [`examples/agent-rules.md`](examples/agent-rules.md) to your global agent instructions (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`).
 
+For Claude Code on macOS or Linux, run this from the project that should have access. Use the Python interpreter with the MCP dependency installed, then check the connection with `/mcp` and ask Claude to call `kb_overview`.
+
+```sh
+claude mcp add --scope local --transport stdio personal-kb -- python3 "$HOME/personal-kb/_同步/kb_mcp.py"
+```
+
+
 ### 4. Background Sync (macOS / Linux / Windows) & E2EE Mobile Sync (Optional)
 
 - **macOS (`launchd` + Keychain AES-256 iCloud mirror)**: [`examples/personal-kb-sync.sh.example`](examples/personal-kb-sync.sh.example) & [`examples/launchd.personal-kb-sync.plist.example`](examples/launchd.personal-kb-sync.plist.example).

@@ -11,7 +11,7 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import atomic_write_text, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
+from kb_filters import archive_path, atomic_write_text, write_manifest, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
 
 KB = Path(__file__).resolve().parent.parent
 DATA = KB / '_同步/chatgpt-raw'
@@ -45,7 +45,7 @@ def ingest(input_path, data_dir: Path = DATA):
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / ('snapshot-' + digest + '.json')
     if not target.exists():
-        target.write_text(raw, encoding='utf-8')
+        atomic_write_text(target, raw)
     return target
 
 
@@ -164,7 +164,7 @@ def render_all(kb_root: Path = KB):
         if ':chatgpt-content-reference' in bodies:
             limitations.append('部分引用为 ChatGPT 内容引用标记；未解析回原引用目标。')
         limitations.append('完整性仅指 read_thread 工具返回的可见消息分页；不证明账号全部历史、其他分支、附件或已删除内容均已覆盖。')
-        out_path = Path('对话/ChatGPT') / (thread_id + '.md')
+        out_path = archive_path(kb_root, 'ChatGPT', thread_id)
         msg_dicts = [{"role": "user" if r == "用户" else "assistant", "text": b} for r, _, _, b in messages]
         if should_skip_conversation(thread_id, title, msg_dicts, noise_cfg):
             (kb_root / out_path).unlink(missing_ok=True)
@@ -212,7 +212,7 @@ def render_all(kb_root: Path = KB):
             'truncated_message_count': truncated_count,
         })
     target = kb_root / '_同步/chatgpt-manifest.json'
-    atomic_write_text(target, json.dumps(manifest, ensure_ascii=False, indent=2))
+    write_manifest(target, manifest)
     print(json.dumps({'threads':len(manifest), 'skipped_noise': skipped_noise, 'turns':sum(x['turn_count'] for x in manifest), 'messages':sum(x['message_count'] for x in manifest), 'incomplete':[x['id'] for x in manifest if not x['complete']]}, ensure_ascii=False))
 
 
