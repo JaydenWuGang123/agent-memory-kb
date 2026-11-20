@@ -118,6 +118,18 @@ class TestDoctorChecks(unittest.TestCase):
 
 
 class TestCJKFts5AndChronologicalSearch(unittest.TestCase):
+    def test_note_filters_before_and_after_indexing(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "INDEX.md").write_text("# searchable", encoding="utf-8")
+            for indexed in (False, True):
+                if indexed:
+                    kb_search.build_search_index(root)
+                for filters, count in (({}, 1), ({"role": "user"}, 0), ({"cwd": "demo"}, 0), ({"cwd": "%"}, 0)):
+                    with self.subTest(indexed=indexed, filters=filters):
+                        hits = kb_search.search_kb(root, "searchable", mode="fts", **filters)
+                        self.assertEqual(len(hits), count)
+
     def test_multi_term_cjk_fts5_and_newest_first_sorting(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

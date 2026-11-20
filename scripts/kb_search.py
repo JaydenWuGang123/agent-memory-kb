@@ -490,8 +490,8 @@ def _search_via_sqlite(
         where.append("d.role = ?")
         params.append(role)
     if cwd:
-        where.append("LOWER(f.cwd) LIKE ?")
-        params.append(f"%{cwd.lower()}%")
+        where.append("instr(LOWER(f.cwd), ?) > 0")
+        params.append(cwd.lower())
     if since:
         where.append("(f.tier = 'curated' OR substr(f.updated_at, 1, 10) >= ?)")
         params.append(since)
@@ -841,7 +841,7 @@ def _search_disk_fallback(
         pat = re.compile(re.escape(query), re.I)
 
     results: list[dict] = []
-    if source in ("all", "notes"):
+    if source in ("all", "notes") and role in ("all", "note") and not cwd:
         curated_files = [root / "INDEX.md", root / "个人档案.md"]
         for folder in ("笔记", "笔记/历史档案", "共享摘录"):
             d = root / folder
