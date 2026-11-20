@@ -803,6 +803,10 @@ class TestRemainingFourExporters(unittest.TestCase):
             self.assertIn("### 2. 助手", cg_md)
             raw_dir = root / "_同步" / "chatgpt-raw"
             raw_dir.rename(Path(td) / "offline-snapshots")
+            manifest = root / "_同步" / "chatgpt-manifest.json"
+            entries = json.loads(manifest.read_text(encoding="utf-8"))
+            entries[0]["path"] = entries[0]["path"].replace("/", "\\")
+            manifest.write_text(json.dumps(entries), encoding="utf-8")
             command = [sys.executable, str(SYNC_DIR / "export_chatgpt.py"), "--output-root", str(root)]
             stats = json.loads(subprocess.check_output(command, text=True))
             self.assertEqual((stats["threads"], stats["messages"]), (1, 2))

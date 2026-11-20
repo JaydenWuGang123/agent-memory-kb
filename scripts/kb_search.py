@@ -57,6 +57,14 @@ def load_manifests(root: Path) -> list[dict]:
         if p.is_file():
             try:
                 for item in json.loads(p.read_text(encoding="utf-8")):
+                    rel = item.get("path")
+                    if not isinstance(rel, str) or not rel:
+                        continue
+                    # Older Windows manifests used native separators.
+                    path = (root / rel.replace("\\", "/")).resolve()
+                    if not path.is_relative_to(root.resolve()) or path.suffix.lower() != ".md":
+                        continue
+                    item["path"] = path.relative_to(root.resolve()).as_posix()
                     if "source" not in item:
                         item["source"] = src
                     items.append(item)

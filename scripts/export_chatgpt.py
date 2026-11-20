@@ -202,7 +202,7 @@ def render_all(kb_root: Path = KB):
         atomic_write_text(target, redact_secrets('\n'.join(header)))
         manifest.append({
             'id': thread_id, 'title': title, 'source': 'chatgpt',
-            'path': str(out_path), 'turn_count': len(turns), 'message_count': len(messages),
+            'path': out_path.as_posix(), 'turn_count': len(turns), 'message_count': len(messages),
             'complete': complete, 'limitations': limitations,
             'tool_pagination_complete': pagination_complete, 'full_history_verified': False,
             'updated_at': date(info.get('updatedAt')), 'created_at': date(info.get('createdAt')),
