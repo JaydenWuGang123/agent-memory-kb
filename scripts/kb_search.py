@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Incremental contentless CJK-aware SQLite FTS5 + chronological search CLI.
 
-Uses contentless_delete=1 FTS5 to eliminate redundant full-text storage (shrinking
+Uses contentless FTS5 to eliminate redundant full-text storage (shrinking
 DB size dramatically), updates only files whose size/mtime changed, supports
 multi-keyword AND with configurable synonym expansion, and falls back to disk scan.
 """

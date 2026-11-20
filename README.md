@@ -122,7 +122,7 @@ flowchart TD
 ## Core Capabilities
 
 - **5-Source Automated Capture**: Strictly read-only exporters for Codex, Cursor, Antigravity, Claude Code, and ChatGPT with `fcntl.flock` concurrency protection and 180s timeout isolation.
-- **Offline Hybrid Search**: SQLite FTS5 (`contentless_delete=1` + CJK unigram tokenization + synonym expansion) fused with local CPU **INT8 ONNX** embeddings via **RRF** (`kb_search.py`).
+- **Offline Hybrid Search**: SQLite FTS5 (`content=''` + CJK unigram tokenization + synonym expansion) fused with local CPU **INT8 ONNX** embeddings via **RRF** (`kb_search.py`).
 - **Native Read-Only MCP Server**: 5 atomic tools (`kb_overview`, `kb_project_context`, `kb_mistakes_and_guardrails`, `kb_search_query`, `kb_read_note`) with strict root path-traversal protection.
 - **Self-Evolving AI Mistake Book**: Automatically detects multi-correction sessions, deduplicates root causes with `[复发 xN]` counters, and injects top guardrails into new sessions.
 - **Industrial DLP & 4-Way DR**: `kb_doctor.py` + `.git/hooks/pre-commit` block secret leaks, broken links, missing citations, and budget overflows; `kb_restore_verify.py` verifies 4-way Git `HEAD` parity.
@@ -145,7 +145,7 @@ flowchart TD
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-All **16 regression unit tests** run in ~7 seconds and are continuously verified on Python 3.11 & 3.12 via GitHub Actions CI.
+GitHub Actions runs the pipeline suite on Ubuntu and Windows with Python 3.11 and 3.12.
 
 ## License
 

@@ -58,7 +58,7 @@ Keeping retrieval inside local SQLite instead of pasting history into prompts cu
 
 Standard SQLite FTS5 tokenizers perform poorly on Chinese/CJK text. `agent-memory-kb` fuses two 100% offline paths with zero cloud API fees:
 
-1. **Lexical Path (`fts`)**: SQLite FTS5 (`contentless_delete=1`) with **CJK unigram + Latin/identifier tokenization**, configurable synonym expansion (`synonyms`), multi-term `AND`, and natural-language query rescue — ideal for exact error codes, field names, and file paths.
+1. **Lexical Path (`fts`)**: SQLite FTS5 (`content=''`) with **CJK unigram + Latin/identifier tokenization**, configurable synonym expansion (`synonyms`), multi-term `AND`, and natural-language query rescue — ideal for exact error codes, field names, and file paths.
 2. **Semantic Path (`semantic`)**: `kb_embed.py` runs a lightweight local **INT8 ONNX** multilingual model on CPU with content-hash incremental caching — ideal when you remember the *meaning* but forgot the exact wording.
 3. **Reciprocal Rank Fusion (`hybrid`)**: Merges both ranked lists via $\text{score} = \sum \frac{1}{k + \text{rank}}$, caps snippets per conversation (`per_conv`) to prevent spam, and prioritizes recent updates (`updated_at`).
 

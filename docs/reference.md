@@ -85,7 +85,7 @@ Example MCP registration ([`examples/mcp_config.example.json`](../examples/mcp_c
 | `scripts/kb_doctor.py` | 7-dimension health gate outputting structured JSON | Python stdlib |
 | `scripts/kb_backup.py` | Atomic `git bundle` + Keychain AES-256 iCloud mirror + private Git remote | Stdlib + `openssl` |
 | `scripts/kb_restore_verify.py` | Isolated restore drill verifying 4-way Git `HEAD` parity | Stdlib + `openssl` |
-| `scripts/test_kb_pipeline.py` | 16 automated regression unit tests covering the full pipeline | Python stdlib |
+| `scripts/test_kb_pipeline.py` | Automated regression tests for the knowledge-base pipeline | Python stdlib |
 
 ---
 
@@ -154,6 +154,6 @@ python3 ~/personal-kb/_同步/kb_restore_verify.py --root ~/personal-kb --check-
 # Strict health check including staleness audit
 python3 ~/personal-kb/_同步/kb_doctor.py --root ~/personal-kb --strict-staleness
 
-# Run all 16 regression unit tests
+# Run the regression suite
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```

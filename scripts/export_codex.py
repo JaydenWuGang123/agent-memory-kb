@@ -121,7 +121,7 @@ def projected_messages(history, thread_id):
     return messages
 
 
-def rollout_messages(path, offset=0, turn_id=None):
+def rollout_messages(path, offset=0, turn_id=None, *, defer_partial_tail=False):
     """Read human-facing events only; response_items would duplicate these events."""
     messages, limitations = [], []
     with path.open("rb") as stream:
@@ -133,7 +133,9 @@ def rollout_messages(path, offset=0, turn_id=None):
                 break
             try:
                 record = json.loads(line)
-            except (ValueError, UnicodeDecodeError):
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                if defer_partial_tail and not line.endswith(b"\n"):
+                    raise
                 limitations.append("原始会话有尚未写完整或无法解析的记录；下次同步会重试。")
                 continue
             payload = record.get("payload", {})
@@ -225,7 +227,7 @@ def main():
         for p in (noise_cfg.get("allowed_cwd_prefixes") or [])
         if isinstance(p, str) and p.strip()
     ]
-    changed = skipped = missing = pruned_noise = 0
+    changed = skipped = missing = pruned_noise = deferred = 0
     for thread in threads:
         thread_id = thread["id"]
         source = Path(thread["rollout_path"])
@@ -294,7 +296,14 @@ def main():
         method = "sqlite-visible-projection"
         if projected_offset is None or projected_offset < stat.st_size:
             offset = projected_offset or 0
-            extra, extra_limitations = rollout_messages(source, offset, messages[-1]["turn_id"] if messages else None)
+            try:
+                extra, extra_limitations = rollout_messages(
+                    source, offset, messages[-1]["turn_id"] if messages else None,
+                    defer_partial_tail=thread_id in previous and target.is_file(),
+                )
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                deferred += 1
+                continue
             messages.extend(extra)
             limitations.extend(extra_limitations)
             method = "rollout-visible-events" if projected_offset is None else "sqlite-visible-projection+rollout-tail"
@@ -329,7 +338,7 @@ def main():
     history.close()
     print(json.dumps({"source_threads": len(all_threads), "eligible_threads": len(threads),
                       "internal_threads_excluded": len(all_threads) - len(threads), "written": changed,
-                      "unchanged": skipped, "pruned_noise": pruned_noise, "missing_sources": missing, "manifest_entries": len(previous),
+                      "unchanged": skipped, "pruned_noise": pruned_noise, "deferred": deferred, "missing_sources": missing, "manifest_entries": len(previous),
                       "message_count": sum(x["message_count"] for x in previous.values()),
                       "threads_with_attachments": sum(bool(x.get("attachment_count")) for x in previous.values()),
                       "all_text_complete": all(x.get("text_complete") for x in previous.values())}, ensure_ascii=False))

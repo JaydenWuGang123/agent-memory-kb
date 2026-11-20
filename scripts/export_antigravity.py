@@ -48,7 +48,7 @@ def extract_cwd(raw: str) -> str:
     return ""
 
 
-def parse_conversation(conv_dir: Path):
+def parse_conversation(conv_dir: Path, *, defer_partial_tail=False):
     full_path = conv_dir / ".system_generated" / "logs" / "transcript_full.jsonl"
     compact_path = conv_dir / ".system_generated" / "logs" / "transcript.jsonl"
     source = full_path if full_path.is_file() else compact_path
@@ -63,12 +63,13 @@ def parse_conversation(conv_dir: Path):
 
     with source.open("r", encoding="utf-8", errors="replace") as f:
         for line_no, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
+            if not line.strip():
                 continue
             try:
                 record = json.loads(line)
-            except ValueError:
+            except json.JSONDecodeError:
+                if defer_partial_tail and not line.endswith("\n"):
+                    raise
                 limitations.append("原始会话存在尚未写完整或无法解析的记录；下次同步会重试。")
                 continue
 
@@ -189,7 +190,7 @@ def main():
 
     synced_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     noise_cfg = load_noise_filter(output)
-    changed = skipped = 0
+    changed = skipped = deferred = 0
 
     if args.brain_dir.is_dir():
         for conv_dir in sorted(args.brain_dir.iterdir()):
@@ -210,7 +211,11 @@ def main():
                 skipped += 1
                 continue
 
-            conv = parse_conversation(conv_dir)
+            try:
+                conv = parse_conversation(conv_dir, defer_partial_tail=conv_dir.name in previous and target.is_file())
+            except json.JSONDecodeError:
+                deferred += 1
+                continue
             if not conv or should_skip_conversation(conv_dir.name, conv["title"], conv["messages"], noise_cfg):
                 previous.pop(conv_dir.name, None)
                 target.unlink(missing_ok=True)
@@ -250,7 +255,7 @@ def main():
     write_manifest(manifest_path, sorted(previous.values(), key=lambda x: x["updated_at"], reverse=True))
     print(json.dumps({
         "written": changed,
-        "unchanged": skipped,
+        "unchanged": skipped, "deferred": deferred,
         "manifest_entries": len(previous),
         "message_count": sum(x["message_count"] for x in previous.values()),
     }, ensure_ascii=False))

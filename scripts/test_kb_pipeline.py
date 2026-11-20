@@ -646,6 +646,25 @@ class TestRetrospectMistakeBook(unittest.TestCase):
 
 
 class TestRemainingFourExporters(unittest.TestCase):
+    def check_interrupted_sync(self, root, command, source, record, old_marker, adapter):
+        def sync():
+            stats = json.loads(subprocess.check_output(command, text=True))
+            kb_search.build_search_index(root)
+            return stats
+
+        def count(marker):
+            return len(kb_search.search_kb(root, marker, source=adapter, role="user", mode="fts"))
+
+        source.write_text(json.dumps(record)[:-3], encoding="utf-8")
+        self.assertEqual(sync()["deferred"], 1)
+        self.assertEqual(count(old_marker), 1)
+        source.write_text(json.dumps(record), encoding="utf-8")
+        self.assertEqual(sync()["written"], 1)
+        self.assertEqual(count(old_marker), 0)
+        self.assertEqual(count("replacementmarker"), 1)
+        self.assertEqual(sync()["unchanged"], 1)
+        self.assertEqual(count("replacementmarker"), 1)
+
     def test_codex_exporter_end_to_end(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "kb"
@@ -691,6 +710,11 @@ class TestRemainingFourExporters(unittest.TestCase):
                 capture_output=True, text=True, check=True,
             ).stdout)
             self.assertEqual(res2["unchanged"], 1)
+
+            self.check_interrupted_sync(root, [sys.executable, str(SYNC_DIR / "export_codex.py"),
+                "--codex-home", str(codex_home), "--output-root", str(root)], rollout,
+                {"type": "event_msg", "payload": {"type": "user_message", "message": "replacementmarker"}},
+                "JWT", "codex")
 
     def test_cursor_exporter_end_to_end(self):
         with tempfile.TemporaryDirectory() as td:
@@ -750,6 +774,10 @@ class TestRemainingFourExporters(unittest.TestCase):
             ag_md = (root / "对话" / "Antigravity" / "ag-1.md").read_text(encoding="utf-8")
             self.assertIn("实现导入提示", ag_md)
             self.assertNotIn("hidden", ag_md)
+
+            self.check_interrupted_sync(root, [sys.executable, str(SYNC_DIR / "export_antigravity.py"),
+                "--brain-dir", str(brain), "--output-root", str(root)], log_dir / "transcript_full.jsonl",
+                {"type": "USER_INPUT", "content": "replacementmarker"}, "导入提示", "antigravity")
 
             # ChatGPT exporter multi-snapshot merge & dedup by message_id
             p1 = Path(td) / "p1.json"

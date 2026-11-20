@@ -145,7 +145,7 @@ flowchart TD
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-全部 **16 项回归测试**约 7 秒完成，并由 GitHub Actions 在 Python 3.11 / 3.12 上持续验证。
+GitHub Actions 在 Ubuntu 和 Windows 上使用 Python 3.11 和 3.12 运行整套回归测试。
 
 ## 开源协议
 
