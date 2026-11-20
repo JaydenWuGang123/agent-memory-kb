@@ -65,7 +65,7 @@ def extract_blocks(content) -> tuple[str, int, bool]:
     return joined, images, (not joined and saw_tool_or_thinking)
 
 
-def parse_session(jsonl_path: Path):
+def parse_session(jsonl_path: Path, *, defer_partial_tail: bool = False):
     messages = []
     limitations = []
     cwd = ""
@@ -74,12 +74,13 @@ def parse_session(jsonl_path: Path):
 
     with jsonl_path.open("r", encoding="utf-8", errors="replace") as f:
         for line_no, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
+            if not line.strip():
                 continue
             try:
                 rec = json.loads(line)
-            except ValueError:
+            except json.JSONDecodeError:
+                if defer_partial_tail and not line.endswith("\n"):
+                    raise
                 limitations.append("原始会话存在尚未写完整或无法解析的记录；下次同步会重试。")
                 continue
 
@@ -184,7 +185,7 @@ def main():
 
     synced_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     noise_cfg = load_noise_filter(output)
-    changed = skipped = 0
+    changed = skipped = deferred = 0
 
     if args.claude_dir.is_dir():
         for jsonl_path in sorted(args.claude_dir.glob("*/*.jsonl")):
@@ -199,7 +200,12 @@ def main():
                 skipped += 1
                 continue
 
-            conv = parse_session(jsonl_path)
+            try:
+                conv = parse_session(jsonl_path, defer_partial_tail=sid in previous and target.is_file())
+            except json.JSONDecodeError:
+                # Keep the last snapshot until the writer finishes the final record.
+                deferred += 1
+                continue
             if not conv or should_skip_conversation(sid, conv["title"], conv["messages"], noise_cfg):
                 previous.pop(sid, None)
                 target.unlink(missing_ok=True)
@@ -236,6 +242,7 @@ def main():
     print(json.dumps({
         "written": changed,
         "unchanged": skipped,
+        "deferred": deferred,
         "manifest_entries": len(previous),
         "message_count": sum(x["message_count"] for x in previous.values()),
     }, ensure_ascii=False))

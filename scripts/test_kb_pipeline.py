@@ -375,6 +375,41 @@ class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
             self.assertEqual(json.loads(second.stdout)["unchanged"], 1)
             self.assertNotIn("a" * 30, manifest.read_text(encoding="utf-8"))
 
+    def test_claude_incremental_search_survives_interrupted_source_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            projects = Path(td) / "projects"
+            session = projects / "project" / "session.jsonl"
+            session.parent.mkdir(parents=True)
+            root = Path(td) / "kb"
+            command = [sys.executable, str(SYNC_DIR / "export_claude.py"),
+                       "--claude-dir", str(projects), "--output-root", str(root)]
+
+            def sync():
+                output = subprocess.check_output(command, text=True)
+                kb_search.build_search_index(root)
+                return json.loads(output)
+
+            def hits(term):
+                return len(kb_search.search_kb(root, term, source="claude", role="user", mode="fts"))
+
+            def record(word):
+                return json.dumps({"type": "user", "message": {"content": word}})
+
+            session.write_text(record("firstmarker"), encoding="utf-8")
+            self.assertEqual(sync()["written"], 1)
+            self.assertEqual(sync()["unchanged"], 1)
+            self.assertEqual(hits("firstmarker"), 1)
+
+            replacement = record("replacementmarker")
+            session.write_text(replacement[:-5], encoding="utf-8")
+            self.assertEqual(sync()["manifest_entries"], 1)
+            self.assertEqual(hits("firstmarker"), 1)
+
+            session.write_text(replacement, encoding="utf-8")
+            self.assertEqual(sync()["written"], 1)
+            self.assertEqual(hits("firstmarker"), 0)
+            self.assertEqual(hits("replacementmarker"), 1)
+
     def test_pipeline_git_bundle_verify_idempotency_and_precommit_hook(self):
         td_kwargs = {"ignore_cleanup_errors": True} if sys.version_info >= (3, 10) else {}
         with tempfile.TemporaryDirectory(**td_kwargs) as td:
