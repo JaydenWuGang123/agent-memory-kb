@@ -20,7 +20,7 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import archive_path, atomic_write_text, write_manifest, clean_ide_prompt, load_noise_filter, redact_secrets, should_skip_conversation, should_skip_exported_markdown  # noqa: E402
+from kb_filters import archive_path, atomic_write_text, write_manifest, clean_ide_prompt, load_noise_filter, redact_secrets, should_skip_conversation, should_skip_exported_markdown, prune_excluded_snapshot  # noqa: E402
 
 VERSION = 3
 VISIBLE_PHASES = {None, "commentary", "final", "final_answer"}
@@ -211,8 +211,9 @@ def main():
     history = connect(args.codex_home / "thread_history_1.sqlite")
     cols = {r[1] for r in state.execute("PRAGMA table_info(threads)").fetchall()}
     sel_cols = "id,title,cwd,source,thread_source,rollout_path,created_at,updated_at,archived"
-    if "creator_user_id" in cols and "creator_account_id" in cols:
-        sel_cols += ",creator_user_id,creator_account_id"
+    for column in ("creator_user_id", "creator_account_id"):
+        if column in cols:
+            sel_cols += "," + column
     all_threads = list(state.execute(f"SELECT {sel_cols} FROM threads"))
     threads = [row for row in all_threads if row["thread_source"] not in {"subagent", "guardian_review"}
                and not row["source"].startswith('{"subagent"')]
@@ -283,7 +284,7 @@ def main():
         stat = source.stat()
         projected_offset = projections.get(thread_id)
         signature = hashlib.sha256(json.dumps([
-            VERSION, thread["title"], thread["updated_at"], thread["archived"],
+            VERSION, noise_cfg, thread["title"], thread["updated_at"], thread["archived"],
             stat.st_size, stat.st_mtime_ns, projected_offset,
         ], ensure_ascii=False).encode()).hexdigest()
         if not args.force and previous.get(thread_id, {}).get("source_signature") == signature and target.exists():
@@ -302,7 +303,8 @@ def main():
                     defer_partial_tail=thread_id in previous and target.is_file(),
                 )
             except (json.JSONDecodeError, UnicodeDecodeError):
-                deferred += 1
+                if not prune_excluded_snapshot(thread_id, previous, target, noise_cfg):
+                    deferred += 1
                 continue
             messages.extend(extra)
             limitations.extend(extra_limitations)

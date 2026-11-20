@@ -173,7 +173,7 @@ def main():
         cwd = ws_map.get(cid, "")
 
         signature = hashlib.sha256(
-            json.dumps([VERSION, cid, name, updated_at, len(headers), cwd], ensure_ascii=False).encode()
+            json.dumps([VERSION, noise_cfg, cid, name, updated_at, len(headers), cwd], ensure_ascii=False).encode()
         ).hexdigest()
         relative = archive_path(output, "Cursor", cid).as_posix()
         target = output / relative

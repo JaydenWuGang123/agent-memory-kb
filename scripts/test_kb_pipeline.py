@@ -409,6 +409,10 @@ class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
             self.assertEqual(sync()["written"], 1)
             self.assertEqual(hits("firstmarker"), 0)
             self.assertEqual(hits("replacementmarker"), 1)
+            config = root / "_同步" / "kb_config.json"
+            config.write_text(json.dumps({"noise_filter": {"excluded_ids": ["session"]}}), encoding="utf-8")
+            self.assertEqual(sync()["manifest_entries"], 0)
+            self.assertEqual(hits("replacementmarker"), 0)
 
     def test_pipeline_git_bundle_verify_idempotency_and_precommit_hook(self):
         td_kwargs = {"ignore_cleanup_errors": True} if sys.version_info >= (3, 10) else {}
@@ -683,11 +687,14 @@ class TestRemainingFourExporters(unittest.TestCase):
             st.execute("INSERT INTO threads VALUES ('th-1', '排查登录', '/Users/dev/app', 'cli', 'user', ?, 1795000000, 1795000100, 0)", (str(rollout),))
             st.execute("INSERT INTO threads VALUES ('th-remote', '别人电脑的电商设计', 'C:\\Users\\other\\design', 'cli', 'user', ?, 1795000000, 1795000100, 0)", (str(rollout),))
             st.execute("INSERT INTO threads VALUES ('th-sub', 'subagent', '/Users/dev/app', 'sub', 'subagent', ?, 1795000000, 1795000100, 0)", (str(rollout),))
+            st.execute("ALTER TABLE threads ADD COLUMN creator_account_id TEXT")
+            st.execute("INSERT INTO threads (id,title,cwd,source,thread_source,rollout_path,creator_account_id) "
+                       "VALUES ('th-excluded','example','','cli','user',?,'excluded')", (str(rollout),))
             st.commit()
             st.close()
             (root / "_同步").mkdir(parents=True, exist_ok=True)
             (root / "_同步" / "kb_config.json").write_text(
-                json.dumps({"noise_filter": {"allowed_cwd_prefixes": ["/Users/dev"]}}),
+                json.dumps({"noise_filter": {"allowed_cwd_prefixes": ["/Users/dev"], "excluded_codex_account_ids": ["excluded"]}}),
                 encoding="utf-8",
             )
 

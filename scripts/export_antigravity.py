@@ -18,7 +18,7 @@ SYNC_DIR = Path(__file__).resolve().parent
 if str(SYNC_DIR) not in sys.path:
     sys.path.insert(0, str(SYNC_DIR))
 
-from kb_filters import archive_path, atomic_write_text, write_manifest, load_noise_filter, redact_secrets, should_skip_conversation  # noqa: E402
+from kb_filters import archive_path, atomic_write_text, write_manifest, load_noise_filter, redact_secrets, should_skip_conversation, prune_excluded_snapshot  # noqa: E402
 
 VERSION = 2
 
@@ -203,7 +203,7 @@ def main():
                 continue
             stat = source.stat()
             signature = hashlib.sha256(
-                json.dumps([VERSION, conv_dir.name, stat.st_size, stat.st_mtime_ns], ensure_ascii=False).encode()
+                json.dumps([VERSION, noise_cfg, conv_dir.name, stat.st_size, stat.st_mtime_ns], ensure_ascii=False).encode()
             ).hexdigest()
             relative = archive_path(output, "Antigravity", conv_dir.name).as_posix()
             target = output / relative
@@ -214,7 +214,8 @@ def main():
             try:
                 conv = parse_conversation(conv_dir, defer_partial_tail=conv_dir.name in previous and target.is_file())
             except json.JSONDecodeError:
-                deferred += 1
+                if not prune_excluded_snapshot(conv_dir.name, previous, target, noise_cfg):
+                    deferred += 1
                 continue
             if not conv or should_skip_conversation(conv_dir.name, conv["title"], conv["messages"], noise_cfg):
                 previous.pop(conv_dir.name, None)

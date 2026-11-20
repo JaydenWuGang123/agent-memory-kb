@@ -325,3 +325,12 @@ def should_skip_exported_markdown(
             buf.append(line)
     _flush()
     return should_skip_conversation(conv_id, title, messages, cfg)
+
+
+def prune_excluded_snapshot(session_id: str, previous: dict, target: Path, noise_cfg: dict) -> bool:
+    """Reapply current exclusions before retaining a snapshot during an interrupted write."""
+    if not should_skip_exported_markdown(session_id, previous[session_id]["title"], target.read_text(encoding="utf-8"), noise_cfg):
+        return False
+    target.unlink()
+    del previous[session_id]
+    return True
