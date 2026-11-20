@@ -801,6 +801,14 @@ class TestRemainingFourExporters(unittest.TestCase):
             cg_md = (root / "对话" / "ChatGPT" / f"{tid}.md").read_text(encoding="utf-8")
             self.assertIn("### 1. 用户", cg_md)
             self.assertIn("### 2. 助手", cg_md)
+            raw_dir = root / "_同步" / "chatgpt-raw"
+            raw_dir.rename(Path(td) / "offline-snapshots")
+            command = [sys.executable, str(SYNC_DIR / "export_chatgpt.py"), "--output-root", str(root)]
+            stats = json.loads(subprocess.check_output(command, text=True))
+            self.assertEqual((stats["threads"], stats["messages"]), (1, 2))
+            kb_search.build_search_index(root)
+            hits = kb_search.search_kb(root, "第二答", source="chatgpt", role="assistant", mode="fts")
+            self.assertEqual([h["title"] for h in hits], ["测试合并"])
 
 
 class TestDlpV2StalenessAndAutoArchive(unittest.TestCase):
