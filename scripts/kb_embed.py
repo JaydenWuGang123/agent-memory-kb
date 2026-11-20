@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - graceful fallback when runtime lacks O
 DEFAULT_MODEL_DIR = Path.home() / ".cache" / "magpie" / "paraphrase-multilingual-MiniLM-L12-v2" / "2c4055b12046"
 EMBED_DIM = 384
 MAX_CHUNKS_PER_ARCHIVE_CONV = 24
-VECTOR_SCHEMA_VERSION = "1"
+VECTOR_SCHEMA_VERSION = "2"
 _VEC_CACHE: dict[str, tuple[int, list[tuple], "np.ndarray"]] = {}
 
 
@@ -121,8 +121,7 @@ def _init_vec_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
         CREATE TABLE doc_vecs (
-            doc_id INTEGER PRIMARY KEY,
-            file_id INTEGER NOT NULL,
+            line INTEGER NOT NULL,
             path TEXT NOT NULL,
             tier TEXT NOT NULL,
             source TEXT NOT NULL,
@@ -130,11 +129,11 @@ def _init_vec_schema(conn: sqlite3.Connection) -> None:
             cwd TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             dim INTEGER NOT NULL,
-            vec BLOB NOT NULL
+            vec BLOB NOT NULL,
+            PRIMARY KEY(path, line)
         )
         """
     )
-    conn.execute("CREATE INDEX idx_doc_vecs_path ON doc_vecs(path)")
 
 
 def _vec_schema_current(vpath: Path) -> bool:
@@ -168,17 +167,17 @@ def _sample_timeline(items: list[tuple], cap: int) -> list[tuple]:
 def _select_representative_chunks(chunks: list[tuple]) -> list[tuple[int, str]]:
     """Select curated chunks or up to MAX_CHUNKS_PER_ARCHIVE_CONV timeline-distributed turns for embedding."""
     selected: list[tuple[int, str]] = []
-    for doc_id, tier, title, section, role, body in chunks:
+    for line, tier, title, section, role, body in chunks:
         cleaned = _clean_for_embedding(body)
         if len(cleaned) < 14:
             continue
         if tier == "curated":
-            selected.append((doc_id, f"{title} / {section}: {cleaned}"))
+            selected.append((line, f"{title} / {section}: {cleaned}"))
         else:
             if role == "meta" or "会话上下文或控制标记" in (section or ""):
                 continue
             label = f"{title} / {section}" if "· 问:" in (section or "") else title
-            selected.append((doc_id, f"{label}: {cleaned}"))
+            selected.append((line, f"{label}: {cleaned}"))
             if len(selected) >= MAX_CHUNKS_PER_ARCHIVE_CONV:
                 break
     return selected
@@ -222,14 +221,14 @@ def sync_vectors(
     removed = [p for p in prev_sigs if p not in current_files]
     changed = [p for p, row in current_files.items() if prev_sigs.get(p) != row[7]]
 
-    pending_docs: list[tuple[int, int, str, str, str, str, str, str, str]] = []
+    pending_docs: list[tuple[int, str, str, str, str, str, str, str]] = []
     for p in changed:
         fid, tier, source, path, title, cwd, updated_at, sig = current_files[p]
         doc_rows = s_conn.execute(
-            "SELECT id, section, role, body FROM docs WHERE file_id = ? ORDER BY id ASC",
+            "SELECT line, section, role, body FROM docs WHERE file_id = ? ORDER BY id ASC",
             (fid,),
         ).fetchall()
-        raw_list = [(d_id, tier, title, sec, role, body) for d_id, sec, role, body in doc_rows]
+        raw_list = [(line, tier, title, sec, role, body) for line, sec, role, body in doc_rows]
         # Build timeline-distributed user + assistant sampling for archive files (covers multi-topic switches)
         if tier == "archive":
             user_turns = [x for x in raw_list if x[4] == "user" and "会话上下文或控制标记" not in (x[3] or "") and len(_clean_for_embedding(x[5])) >= 14]
@@ -239,14 +238,14 @@ def sync_vectors(
             ordered = _sample_timeline(user_turns, 14) + _sample_timeline(asst_turns, 10)
         else:
             ordered = raw_list
-        role_map = {d_id: role for d_id, _, _, _, role, _ in raw_list}
-        for d_id, embed_txt in _select_representative_chunks(ordered):
-            pending_docs.append((d_id, fid, path, tier, source, role_map.get(d_id, "note"), cwd, updated_at, embed_txt))
+        role_map = {line: role for line, _, _, _, role, _ in raw_list}
+        for line, embed_txt in _select_representative_chunks(ordered):
+            pending_docs.append((line, path, tier, source, role_map.get(line, "note"), cwd, updated_at, embed_txt))
     s_conn.close()
 
     vectors = None
     if pending_docs:
-        texts = [item[8] for item in pending_docs]
+        texts = [item[7] for item in pending_docs]
         vectors = encode_fn(texts) if encode_fn is not None else eng.encode(texts)
 
     with v_conn:
@@ -254,12 +253,12 @@ def sync_vectors(
             v_conn.execute("DELETE FROM doc_vecs WHERE path = ?", (p,))
             v_conn.execute("DELETE FROM synced_files WHERE path = ?", (p,))
         if pending_docs and vectors is not None:
-            for idx, (d_id, fid, path, tier, source, role, cwd, updated_at, _) in enumerate(pending_docs):
+            for idx, (line, path, tier, source, role, cwd, updated_at, _) in enumerate(pending_docs):
                 blob = np.asarray(vectors[idx], dtype=np.float16).tobytes()
                 v_conn.execute(
-                    "INSERT INTO doc_vecs(doc_id, file_id, path, tier, source, role, cwd, updated_at, dim, vec) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (d_id, fid, path, tier, source, role, cwd, updated_at, int(vectors.shape[1]), blob),
+                    "INSERT INTO doc_vecs(line, path, tier, source, role, cwd, updated_at, dim, vec) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (line, path, tier, source, role, cwd, updated_at, int(vectors.shape[1]), blob),
                 )
         for p in changed:
             v_conn.execute("INSERT INTO synced_files(path, sig) VALUES (?, ?)", (p, current_files[p][7]))
@@ -301,7 +300,7 @@ def query_vectors(
     root = root.resolve()
     vec_db = root / "_同步" / "vectors.sqlite"
     search_db = root / "_同步" / "search_index.sqlite"
-    if np is None or not vec_db.is_file() or not search_db.is_file():
+    if np is None or not _vec_schema_current(vec_db) or not search_db.is_file():
         return []
 
     eng = embedder or LocalOnnxEmbedder()
@@ -321,7 +320,8 @@ def query_vectors(
         v_conn = sqlite3.connect(vec_db.resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0)
         try:
             raw_rows = v_conn.execute(
-                "SELECT doc_id, path, tier, source, role, cwd, updated_at, dim, vec FROM doc_vecs"
+                "SELECT line, path, tier, source, role, cwd, updated_at, sig, vec "
+                "FROM doc_vecs JOIN synced_files USING(path)"
             ).fetchall()
         finally:
             v_conn.close()
@@ -373,20 +373,20 @@ def query_vectors(
             sim = float(sims[idx])
             if sim <= 0.15:
                 break
-            doc_id, path, tier, src, d_role, d_cwd, upd, _ = rows[idx]
+            line, path, tier, src, d_role, d_cwd, upd, sig = rows[idx]
             if conv_counts.get(path, 0) >= eff_per_conv:
                 continue
             drow = s_conn.execute(
-                "SELECT f.title, d.section, d.time, d.line, d.body "
-                "FROM docs d JOIN files f ON d.file_id = f.id WHERE d.id = ?",
-                (doc_id,),
+                "SELECT d.id, f.title, d.section, d.time, d.line, d.body "
+                "FROM docs d JOIN files f ON d.file_id = f.id WHERE f.path = ? AND f.sig = ? AND d.line = ?",
+                (path, sig, line),
             ).fetchone()
             if not drow:
                 continue
             conv_counts[path] = conv_counts.get(path, 0) + 1
             clean_body = re.sub(r"\s+", " ", drow["body"]).strip()
             results.append({
-                "doc_id": doc_id,
+                "doc_id": drow["id"],
                 "tier": tier,
                 "source": src,
                 "path": path,

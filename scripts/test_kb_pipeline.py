@@ -835,6 +835,34 @@ class TestDlpV2StalenessAndAutoArchive(unittest.TestCase):
 
 
 class TestHybridSearchAndMcp(unittest.TestCase):
+    def test_vector_citations_survive_search_index_replacement(self):
+        import kb_embed
+        if kb_embed.np is None:
+            self.skipTest("Optional vector runtime unavailable")
+
+        def encode(texts):
+            return kb_embed.np.ones((len(texts), 1), dtype=kb_embed.np.float32)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            note = root / "笔记" / "food.md"
+            note.parent.mkdir()
+            note.write_text("# lunch\nCooking fresh potato soup with carrots", encoding="utf-8")
+            kb_search.build_search_index(root)
+            kb_embed.sync_vectors(root, encode_fn=encode)
+            (root / "INDEX.md").write_text("# repairs\nReplacing a broken phone screen", encoding="utf-8")
+            (root / "_同步" / "search_index.sqlite").unlink()
+            kb_search.build_search_index(root)
+            hit, = kb_embed.query_vectors(root, "food", encode_fn=encode)
+            self.assertEqual(hit["path"], "笔记/food.md")
+            self.assertIn("potato soup", hit["snippet"])
+            note.write_text("# dinner\nMaking fresh pasta from scratch", encoding="utf-8")
+            kb_search.build_search_index(root)
+            self.assertEqual(kb_embed.query_vectors(root, "food", encode_fn=encode), [])
+            kb_embed.sync_vectors(root, encode_fn=encode)
+            hits = kb_embed.query_vectors(root, "food", encode_fn=encode)
+            self.assertTrue(any("fresh pasta" in h["snippet"] for h in hits))
+
     def test_nl_rescue_rrf_and_mcp_server(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
