@@ -46,3 +46,27 @@ jobs:
           python ./tmp-ci-dev-kb/_同步/kb_doctor.py --root ./tmp-ci-dev-kb --skip-external-checks
           python init_kb.py --root ./tmp-ci-general-kb --profile general
           python ./tmp-ci-general-kb/_同步/kb_doctor.py --root ./tmp-ci-general-kb --skip-external-checks
+
+      - name: Check scheduled sync propagates Python failures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "kb-scheduler-test"
+          $sync = New-Item -ItemType Directory -Force (Join-Path $root "_同步")
+          Set-Content -LiteralPath (Join-Path $sync.FullName "build_kb_index.py") -Value "raise SystemExit(7)"
+          pwsh -NoProfile -File ./examples/windows-sync.ps1 -KbRoot $root
+          if ($LASTEXITCODE -ne 7) { throw "Scheduled sync lost the Python exit code" }
+          exit 0
+
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt
+      - name: Verify semantic citations across index rebuilds
+        run: |
+          python -c "import numpy, onnxruntime, tokenizers"
+          python scripts/test_kb_pipeline.py TestHybridSearchAndMcp.test_vector_citations_survive_search_index_replacement
