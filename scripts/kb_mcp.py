@@ -323,6 +323,8 @@ def kb_read_note_data(
         raise FileNotFoundError(f"KB note not found: {rel_clean}")
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
     s_idx = max(1, int(start_line))
+    if s_idx > len(lines):
+        raise ValueError(f"Requested line {s_idx}, but {rel_clean} has {len(lines)} lines")
     sec_q = (section or "").lstrip("#").strip().lower()
     if sec_q and s_idx == 1:
         matched_line = 0

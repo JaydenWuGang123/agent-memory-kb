@@ -302,6 +302,23 @@ class TestArchiveProfile(unittest.TestCase):
             self.assertEqual(doc_res["missing_citations"], [])
 
 
+class TestNoteLineRange(unittest.TestCase):
+    def test_last_line_and_stale_citation(self):
+        from kb_mcp import kb_read_note_data
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            note = root / "sample.md"
+            note.write_text("first\nlast\n", encoding="utf-8")
+            result = kb_read_note_data(note.name, start_line=2, root=root)
+            self.assertEqual(result["content"], "2: last")
+            with self.assertRaisesRegex(ValueError, "line 3.*2 lines"):
+                kb_read_note_data(note.name, start_line=3, root=root)
+            note.write_text("", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "line 1.*0 lines"):
+                kb_read_note_data(note.name, root=root)
+
+
 class TestClaudeAndPipelineAndGitHook(unittest.TestCase):
     def test_archive_path_requires_a_single_component(self):
         from kb_filters import archive_path
