@@ -75,8 +75,10 @@ python3 ~/personal-kb/_同步/kb_search.py --root ~/personal-kb -q "关键词或
 ### 3. 接入只读 MCP Server 与离线语义向量（可选）
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+使用语义检索时，将 `AGENT_MEMORY_KB_MODEL_DIR` 指向存放 `paraphrase-multilingual-MiniLM-L12-v2` 配套文件 `model_int8.onnx` 和 `tokenizer.json` 的目录。安装依赖和检索使用同一虚拟环境。建好全文索引后，运行 `python ~/personal-kb/_同步/kb_embed.py --root ~/personal-kb --sync`，确认返回 `status: ok`。缺少模型时，混合检索使用全文结果。
 
 参照 [`examples/mcp_config.example.json`](examples/mcp_config.example.json) 将 `~/personal-kb/_同步/kb_mcp.py` 注册进 **Codex / Cursor / Claude Code / Antigravity**，并将 [`examples/agent-rules.md`](examples/agent-rules.md) 放入全局 Agent 规则（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`）。
 

@@ -21,7 +21,9 @@ ARCHIVE_SOURCES = ("codex", "chatgpt", "cursor", "antigravity", "claude")
 REGEX_META_RE = re.compile(r"[|*?+()\[\]{}\\]")
 SCHEMA_VERSION = "3"
 SYNC_DIR = Path(__file__).resolve().parent
-VEC_PYTHON = Path("/usr/local/bin/python3") if Path("/usr/local/bin/python3").is_file() else Path(sys.executable)
+VEC_PYTHON = Path(sys.executable)
+if sys.prefix == sys.base_prefix and Path("/usr/local/bin/python3").is_file():
+    VEC_PYTHON = Path("/usr/local/bin/python3")
 
 
 def cjk_tokenize(text: str) -> str:

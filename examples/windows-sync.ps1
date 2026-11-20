@@ -20,3 +20,4 @@ if (-not (Test-Path $ScriptPath)) {
 }
 
 python $ScriptPath --output-root $KbRoot --skip-icloud --no-notify
+exit $LASTEXITCODE

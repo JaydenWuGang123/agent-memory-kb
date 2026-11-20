@@ -26,7 +26,10 @@ except ImportError:  # pragma: no cover - graceful fallback when runtime lacks O
     ort = None
     Tokenizer = None
 
-DEFAULT_MODEL_DIR = Path.home() / ".cache" / "magpie" / "paraphrase-multilingual-MiniLM-L12-v2" / "2c4055b12046"
+DEFAULT_MODEL_DIR = Path(os.environ.get(
+    "AGENT_MEMORY_KB_MODEL_DIR",
+    Path.home() / ".cache" / "magpie" / "paraphrase-multilingual-MiniLM-L12-v2" / "2c4055b12046",
+)).expanduser()
 EMBED_DIM = 384
 MAX_CHUNKS_PER_ARCHIVE_CONV = 24
 VECTOR_SCHEMA_VERSION = "2"

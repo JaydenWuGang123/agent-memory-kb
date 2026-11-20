@@ -76,8 +76,8 @@ Example MCP registration ([`examples/mcp_config.example.json`](../examples/mcp_c
 | `scripts/export_claude.py` | Read-only incremental exporter for Claude Code (filters thinking/tool blocks) | Python stdlib |
 | `scripts/export_chatgpt.py` | Incremental importer/normalizer for ChatGPT exports | Python stdlib |
 | `scripts/build_kb_index.py` | Main orchestrator: `flock`, 180s timeout, dual classification, live Git probe, FTS5 index, idempotent commit | Python stdlib |
-| `scripts/kb_search.py` | CLI & library for `fts`, `semantic`, and `hybrid` (RRF) search | Stdlib (`fts`); optional ONNX |
-| `scripts/kb_embed.py` | Offline INT8 ONNX embedding builder with content-hash caching | Optional (`requirements.txt`) |
+| `scripts/kb_search.py` | CLI & library for `fts`, `vector`, and `hybrid` (RRF) search | Stdlib (`fts`); optional ONNX |
+| `scripts/kb_embed.py` | Offline INT8 ONNX embedding builder with incremental file-signature tracking | Optional (`requirements.txt`) |
 | `scripts/kb_mcp.py` | Standard Read-Only MCP server exposing 5 tools to AI agents | Optional (`mcp`) |
 | `scripts/kb_retrospect.py` | Multi-correction detector & mistake-book review queue manager | Python stdlib |
 | `scripts/archive_profile.py` | Monthly cold-archiver for `个人档案.md` with automatic link rebasing | Python stdlib |

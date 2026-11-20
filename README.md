@@ -75,8 +75,10 @@ python3 ~/personal-kb/_同步/kb_search.py --root ~/personal-kb -q "your query" 
 ### 3. Connect Read-Only MCP & Offline Semantic Search (Optional)
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+For semantic search, set `AGENT_MEMORY_KB_MODEL_DIR` to the directory containing the matching `model_int8.onnx` and `tokenizer.json` for `paraphrase-multilingual-MiniLM-L12-v2`. Use the same virtual environment for installation and search. After building the text index, run `python ~/personal-kb/_同步/kb_embed.py --root ~/personal-kb --sync` and check for `status: ok`. Without the model, hybrid search uses full-text results.
 
 Register `~/personal-kb/_同步/kb_mcp.py` in Codex / Cursor / Claude Code / Antigravity using [`examples/mcp_config.example.json`](examples/mcp_config.example.json), and add [`examples/agent-rules.md`](examples/agent-rules.md) to your global agent instructions (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md`).
 
