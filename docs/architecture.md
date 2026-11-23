@@ -91,3 +91,11 @@ Standard SQLite FTS5 tokenizers perform poorly on Chinese/CJK text. `agent-memor
   3. macOS Keychain **AES-256 encrypted iCloud bundle** (with round-trip decrypt check & resilient orphan `.tmp.*` cleanup);
   4. Private Git remote (with an anti-public-URL safety gate rejecting remotes containing `public`);
   5. Isolated-directory restore drill verifying identical Git `HEAD` hashes across all 4 copies.
+
+---
+
+## 8. Optional Track 2: Dual-Track Multimodal RAG Extension（可选轨道 2：多模态深度 RAG 扩展）
+
+While Track 1 (`agent-memory-kb`) stays 100% pure Python with zero Docker/GPU overhead for daily coding, complex PDFs (multi-column tables, formulas, scanned reports, Office decks) can optionally mount **Track 2**:
+- **Recursive Parsed-Doc Indexing**: `kb_search.py` automatically indexes `资料/**/*.md`, so Markdown exported by local MinerU CLI immediately becomes searchable in Track 1.
+- **On-Demand Zero-API-Cost Stack** ([`docs/optional-multimodal-rag.md`](optional-multimodal-rag.md) & [`extensions/weknora-rag/`](../extensions/weknora-rag/)): Combines local GPU **MinerU 4.2+** (`:8000`), local **Qwen/Qwen3-Embedding-0.6B** (`:8001`, 1024d / 32K), on-demand **WeKnora Docker** (`:8880`), DLP-redacted incremental sync (`kb_sync_weknora.py`), and a zero-dependency 4-client MCP stdio bridge (`weknora_mcp_bridge.py`) with physical separation between the long-term personal vault and temporary work documents.

@@ -185,6 +185,9 @@ def _collect_all_targets(root: Path) -> dict[str, tuple[str, Path, dict | None]]
         d = root / folder
         if d.is_dir():
             curated_files.extend(sorted(d.glob("*.md")))
+    docs_dir = root / "资料"
+    if docs_dir.is_dir():
+        curated_files.extend(sorted(docs_dir.rglob("*.md")))
     for f in curated_files:
         if f.is_file():
             rel = f.relative_to(root).as_posix()
@@ -857,6 +860,9 @@ def _search_disk_fallback(
             d = root / folder
             if d.is_dir():
                 curated_files.extend(sorted(d.glob("*.md")))
+        docs_dir = root / "资料"
+        if docs_dir.is_dir():
+            curated_files.extend(sorted(docs_dir.rglob("*.md")))
         for f in curated_files:
             if not f.is_file():
                 continue

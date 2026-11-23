@@ -5,7 +5,7 @@
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB.svg)](https://www.python.org/)
 [![Local-First](https://img.shields.io/badge/Local--First-零云端费用-059669.svg)](#为什么做-agent-memory-kb)
 
-[English README](README.md) · [架构与原理深度解析](docs/architecture.md) · [完整 API / 配置 / 脚本手册](docs/reference.md) · [团队落地与 FAQ](docs/team-and-faq.md)
+[English README](README.md) · [架构与原理深度解析](docs/architecture.md) · [完整 API / 配置 / 脚本手册](docs/reference.md) · [团队落地与 FAQ](docs/team-and-faq.md) · [可选双轨多模态 RAG](docs/optional-multimodal-rag.md)
 
 面向重度使用多个 AI 编程助手的开发者（**Codex / Claude Code / Cursor / Antigravity / ChatGPT**）的**本地优先（Local-First）、Git 驱动、自带离线混合检索 MCP + 错题本自进化 + 工业级防漏容灾**知识库引擎。
 
@@ -138,6 +138,7 @@ flowchart TD
 | [**架构与核心机制深度解析**](docs/architecture.md) | 跨 Agent 接力时序图、3 跳 Token 经济账、CJK FTS5 + RRF 混合检索原理、防幻觉证据链、DLP v2 与四端容灾机制 |
 | [**完整参考手册**](docs/reference.md) | 初始化目录结构全景、5 个 MCP 工具精确 API 参数表、16 个脚本速查表、`kb_config.json` 全字段参考、日常 CLI 命令速查 |
 | [**团队落地与 FAQ**](docs/team-and-faq.md) | 企业内网 GitLab 100% 闭环指南、SSOT 个人/团队规范隔离、3 阶段低风险推广路线图、8 个高频常见问题 |
+| [**可选轨道 2：双轨多模态深度 RAG**](docs/optional-multimodal-rag.md) | 16GB 笔记本零云端费用跑通本地 MinerU 4.2+ PDF/Office 解析 + 本地 Qwen3-Embedding-0.6B + 按需启停 WeKnora Docker + 四端 MCP 桥接与个人/工作物理分库（[`extensions/weknora-rag/`](extensions/weknora-rag/)） |
 
 ---
 
@@ -147,7 +148,7 @@ flowchart TD
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-GitHub Actions 在 Ubuntu 和 Windows 上使用 Python 3.11 和 3.12 运行整套回归测试。
+GitHub Actions 在 Ubuntu 和 Windows 上使用 Python 3.11 和 3.12 运行整套回归测试（23 项单测）。
 
 ## 开源协议
 

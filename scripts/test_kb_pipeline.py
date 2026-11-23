@@ -990,5 +990,27 @@ class TestInitGeneralProfile(unittest.TestCase):
             self.assertTrue(report["healthy"], f"Doctor failed for general profile: {report}")
 
 
+class TestRecursiveDocsIndexing(unittest.TestCase):
+    def test_parsed_docs_subdirectory_indexed_in_fts_and_legacy_scan(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "_同步").mkdir()
+            nested_dir = root / "资料" / "技术资料"
+            nested_dir.mkdir(parents=True)
+            (nested_dir / "mineru_sample.md").write_text(
+                "# MinerU 解析样本\n\n本文件验证双轨解析产物自动纳入本地混合检索（特征词：WeKnoraDualTrackToken）。\n",
+                encoding="utf-8",
+            )
+            kb_search.build_search_index(root)
+
+            fts_hits = kb_search.search_kb(root, "WeKnoraDualTrackToken", source="notes", mode="fts", limit=5)
+            self.assertTrue(fts_hits)
+            self.assertEqual(fts_hits[0]["path"], "资料/技术资料/mineru_sample.md")
+
+            legacy_hits = kb_search._search_disk_fallback(root, "WeKnoraDualTrackToken", "notes", "all", "", "", 5, 2)
+            self.assertTrue(legacy_hits)
+            self.assertEqual(legacy_hits[0]["path"], "资料/技术资料/mineru_sample.md")
+
+
 if __name__ == "__main__":
     unittest.main()

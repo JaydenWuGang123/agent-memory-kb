@@ -5,7 +5,7 @@
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB.svg)](https://www.python.org/)
 [![Local-First](https://img.shields.io/badge/Local--First-Zero%20Cloud%20API%20Cost-059669.svg)](#why-agent-memory-kb)
 
-[简体中文首页 (README.zh-CN.md)](README.zh-CN.md) · [Architecture](docs/architecture.md) · [Full Reference](docs/reference.md) · [Team & FAQ](docs/team-and-faq.md)
+[简体中文首页 (README.zh-CN.md)](README.zh-CN.md) · [Architecture](docs/architecture.md) · [Full Reference](docs/reference.md) · [Team & FAQ](docs/team-and-faq.md) · [Optional Multimodal RAG](docs/optional-multimodal-rag.md)
 
 **A local-first, Git-backed, AI-native Personal Knowledge Base & Read-Only MCP Server for multi-agent developers** — connecting **Codex, Claude Code, Cursor, Antigravity, and ChatGPT** to one structured, privacy-safe, self-evolving brain on your own machine.
 
@@ -138,6 +138,7 @@ flowchart TD
 | [**Architecture & Core Mechanisms**](docs/architecture.md) | Multi-agent handoff sequence diagram, 3-Hop Token Economics, CJK FTS5 + RRF design, anti-hallucination evidence chain, DLP & 4-way DR |
 | [**Complete Reference**](docs/reference.md) | Generated directory tree, all 5 MCP tool signatures, 16-script reference table, full `kb_config.json` schema, daily CLI cheat sheet |
 | [**Team Adoption & FAQ**](docs/team-and-faq.md) | Enterprise internal GitLab setup, SSOT team/personal separation, 3-phase rollout roadmap, and 8 detailed FAQs |
+| [**Optional Track 2: Multimodal RAG**](docs/optional-multimodal-rag.md) | Zero-API-cost local GPU MinerU 4.2+ PDF/Office parser + local Qwen3-Embedding-0.6B + on-demand WeKnora Docker + 4-client MCP bridge & personal/work KB physical isolation ([`extensions/weknora-rag/`](extensions/weknora-rag/)) |
 
 ---
 
@@ -147,7 +148,7 @@ flowchart TD
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-GitHub Actions runs the pipeline suite on Ubuntu and Windows with Python 3.11 and 3.12.
+GitHub Actions runs the full regression suite (23 unit tests) on Ubuntu and Windows with Python 3.11 and 3.12.
 
 ## License
 

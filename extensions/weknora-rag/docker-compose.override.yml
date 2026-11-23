@@ -1,0 +1,3 @@
+services:
+  docreader:
+    image: wechatopenai/weknora-docreader:latest

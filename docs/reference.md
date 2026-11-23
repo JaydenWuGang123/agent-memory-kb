@@ -85,7 +85,7 @@ Example MCP registration ([`examples/mcp_config.example.json`](../examples/mcp_c
 | `scripts/kb_doctor.py` | 7-dimension health gate outputting structured JSON | Python stdlib |
 | `scripts/kb_backup.py` | Atomic `git bundle` + Keychain AES-256 iCloud mirror + private Git remote | Stdlib + `openssl` |
 | `scripts/kb_restore_verify.py` | Isolated restore drill verifying 4-way Git `HEAD` parity | Stdlib + `openssl` |
-| `scripts/test_kb_pipeline.py` | Automated regression tests for the knowledge-base pipeline | Python stdlib |
+| `scripts/test_kb_pipeline.py` | Automated regression tests for the full pipeline (including recursive `资料/**/*.md` indexing) | Python stdlib |
 
 ---
 
