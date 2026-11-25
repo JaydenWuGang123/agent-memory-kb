@@ -1012,5 +1012,60 @@ class TestRecursiveDocsIndexing(unittest.TestCase):
             self.assertEqual(legacy_hits[0]["path"], "资料/技术资料/mineru_sample.md")
 
 
+class TestSkillAndInstaller(unittest.TestCase):
+    def test_agent_skill_manifest_is_valid_and_sanitized(self):
+        repo_root = SYNC_DIR.parent
+        skill_md = repo_root / "skills" / "agent-memory-kb" / "SKILL.md"
+        if not skill_md.exists():
+            self.skipTest("skills/agent-memory-kb/SKILL.md not present outside repo checkout")
+        txt = skill_md.read_text(encoding="utf-8")
+        self.assertTrue(txt.startswith("---\n"))
+        self.assertIn("\nname: agent-memory-kb\n", txt)
+        self.assertIn("\ndescription: ", txt)
+        self.assertIn("npx skills add JaydenWuGang123/agent-memory-kb", txt)
+        self.assertEqual(kb_filters.find_raw_secrets(txt), [])
+        self.assertNotIn("/Users/", txt)
+        self.assertNotIn("C:\\Users\\", txt)
+
+    def test_posix_installer_dry_run_and_offline_bootstrap(self):
+        if os.name == "nt":
+            self.skipTest("install.sh targets POSIX shells")
+        repo_root = SYNC_DIR.parent
+        installer = repo_root / "install.sh"
+        if not installer.exists():
+            self.skipTest("install.sh not present outside repo checkout")
+        with tempfile.TemporaryDirectory() as td:
+            dry_target = Path(td) / "dry-kb"
+            dry_res = subprocess.run(
+                ["bash", str(installer), "--source-dir", str(repo_root), "--root", str(dry_target), "--profile", "general", "--dry-run"],
+                capture_output=True, text=True, check=True,
+            )
+            self.assertIn("DRY-RUN plan", dry_res.stdout)
+            self.assertFalse(dry_target.exists())
+
+            real_target = Path(td) / "real-kb"
+            env = dict(os.environ)
+            env["PERSONAL_KB_SKIP_KEYCHAIN"] = "1"
+            real_res = subprocess.run(
+                ["bash", str(installer), "--source-dir", str(repo_root), "--root", str(real_target), "--profile", "general", "--skip-sync"],
+                capture_output=True, text=True, env=env, check=True,
+            )
+            self.assertIn("agent-memory-kb is ready", real_res.stdout)
+            self.assertTrue((real_target / "INDEX.md").is_file())
+            self.assertTrue((real_target / "_同步" / "kb_mcp.py").is_file())
+
+            # Reject invalid profile and unsafe ref
+            bad_prof = subprocess.run(
+                ["bash", str(installer), "--profile", "evil", "--dry-run"],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertNotEqual(bad_prof.returncode, 0)
+            bad_ref = subprocess.run(
+                ["bash", str(installer), "--ref", "main;id", "--dry-run"],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertNotEqual(bad_ref.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

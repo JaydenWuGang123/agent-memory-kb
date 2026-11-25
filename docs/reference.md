@@ -69,6 +69,8 @@ Example MCP registration ([`examples/mcp_config.example.json`](../examples/mcp_c
 
 | Script | Purpose | Dependencies |
 | --- | --- | --- |
+| `skills/agent-memory-kb/SKILL.md` | Standard Agent Skill (`npx skills add`) with guided first-time bootstrap, 3-Hop read & one-sentence distillation protocols | Any Agent Skills host |
+| `install.sh` | Transparent POSIX one-line installer (`--dry-run`, `--profile dev\|general`, never edits global IDE/Agent configs) | `bash`, `git`, Python 3.9+ |
 | `init_kb.py` | Bootstraps directory layout, templates, config, Git repo, and DLP `pre-commit` hook | Python 3.9+ stdlib |
 | `scripts/export_codex.py` | Read-only incremental exporter for Codex sessions | Python stdlib |
 | `scripts/export_cursor.py` | Read-only incremental exporter for Cursor workspace SQLite chats | Python stdlib |

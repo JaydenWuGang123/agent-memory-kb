@@ -43,15 +43,37 @@
 
 ## 5 分钟快速上手
 
-### 方式 A：一句话让 Codex 替你全自动装好（不会敲命令直接用这个！）
+### 方式 A：一行命令接入 Agent Skill（最推荐 · 支持 Codex / Claude Code / Cursor / Antigravity）
 
-根本不用自己打开终端敲命令、改 JSON，**直接把下面这句话发给你的 Codex / Claude Code / Antigravity**：
+直接把官方 Skill 装进你的 AI 编程助手：
+
+```bash
+npx skills add JaydenWuGang123/agent-memory-kb
+```
+
+装完后直接对 AI 说一句：**「帮我初始化我的个人知识库」**。Skill 会先确认你的使用模式（`dev` 研发版 / `general` 通用非研发版），自动拉取引擎建库、跑首次同步与 `kb_doctor` 体检，并在征得你确认后再最小化接入只读 MCP；以后日常说「沉淀到知识库 / 更新项目进度 / 查一下之前怎么定的」也会自动按三跳协议生效。
+
+### 方式 B：透明一键命令行初始化（macOS / Linux，不私自改全局配置）
+
+支持先用 `--dry-run` 预览完整动作，**绝不静默修改**你的 `~/.codex` / `~/.claude` / `~/.cursor` 配置或后台定时任务：
+
+```bash
+# 研发模式（默认，含活跃代码仓库 Git 探针）：
+curl -fsSL https://raw.githubusercontent.com/JaydenWuGang123/agent-memory-kb/main/install.sh | bash -s -- --profile dev
+
+# 通用非研发模式（PM / 创作者 / 个人规划，含目标看板与表达偏好避坑本）：
+curl -fsSL https://raw.githubusercontent.com/JaydenWuGang123/agent-memory-kb/main/install.sh | bash -s -- --profile general
+```
+
+### 方式 C：零命令纯对话安装（不想敲任何终端命令）
+
+**直接把下面这句话发给你的 Codex / Claude Code / Antigravity**：
 
 ```text
 请帮我克隆 https://github.com/JaydenWuGang123/agent-memory-kb 并初始化到 ~/personal-kb（如果我不是程序员请加 --profile general，否则用 --profile dev）。按项目说明帮我完成首次同步、kb_doctor 健康体检、只读 MCP 接入和全局规则配置，全程用大白话告诉我结果；涉及可选云备份配置时先问我再操作。
 ```
 
-### 方式 B：手动命令行初始化（仅需 Python 3.9+ 标准库）
+### 方式 D：手动命令行初始化（仅需 Python 3.9+ 标准库）
 
 ```bash
 git clone https://github.com/JaydenWuGang123/agent-memory-kb.git
@@ -148,7 +170,7 @@ flowchart TD
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-GitHub Actions 在 Ubuntu 和 Windows 上使用 Python 3.11 和 3.12 运行整套回归测试（23 项单测）。
+GitHub Actions 在 Ubuntu 和 Windows 上使用 Python 3.11 和 3.12 运行整套回归测试（25 项单测）。
 
 ## 开源协议
 

@@ -43,15 +43,37 @@ Whether you write code or simply use **Codex / Claude Code / Antigravity / ChatG
 
 ## 5-Minute Quickstart
 
-### Option A: Zero-Command Setup (Recommended for Codex / Claude / Antigravity Users)
+### Option A: One-Command Agent Skill Install (Recommended — Codex / Claude Code / Cursor / Antigravity)
 
-Don't want to run terminal commands or edit JSON by hand? **Paste this single prompt directly into Codex, Claude Code, or Antigravity**:
+Install the official skill into your Agent in one line:
+
+```bash
+npx skills add JaydenWuGang123/agent-memory-kb
+```
+
+Then simply tell your AI Agent: **"Initialize my personal knowledge base"** (or **"帮我初始化我的个人知识库"**). The skill guides you through choosing `--profile dev` or `--profile general`, initializing `~/personal-kb`, running the first sync & `kb_doctor`, and wiring up the read-only MCP server only after your confirmation — plus gives your Agent the daily 3-Hop Read & One-Sentence Distillation protocol out of the box.
+
+### Option B: Transparent One-Line Shell Bootstrap (macOS / Linux)
+
+Preview first with `--dry-run`, or run directly (never silently alters global IDE/Agent configs or installs background daemons):
+
+```bash
+# Developers (default, includes active Git repo probe):
+curl -fsSL https://raw.githubusercontent.com/JaydenWuGang123/agent-memory-kb/main/install.sh | bash -s -- --profile dev
+
+# Non-developers / PMs / creators (goals & expression-preference templates):
+curl -fsSL https://raw.githubusercontent.com/JaydenWuGang123/agent-memory-kb/main/install.sh | bash -s -- --profile general
+```
+
+### Option C: Zero-Command Prompt (Without `npx` or `curl`)
+
+Don't want to run any terminal command? **Paste this single prompt directly into Codex, Claude Code, or Antigravity**:
 
 ```text
 Please clone https://github.com/JaydenWuGang123/agent-memory-kb and initialize it into ~/personal-kb (use --profile general if I am not a software developer, otherwise --profile dev). Complete the first sync, run kb_doctor.py, wire up the read-only MCP server, and add the global agent rules. Explain each step in plain language and ask me before any optional backup setup.
 ```
 
-### Option B: Manual Setup (Pure Python 3.9+ Stdlib)
+### Option D: Manual Setup (Pure Python 3.9+ Stdlib)
 
 ```bash
 git clone https://github.com/JaydenWuGang123/agent-memory-kb.git
@@ -148,7 +170,7 @@ flowchart TD
 PERSONAL_KB_SKIP_KEYCHAIN=1 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-GitHub Actions runs the full regression suite (23 unit tests) on Ubuntu and Windows with Python 3.11 and 3.12.
+GitHub Actions runs the full regression suite (25 unit tests) on Ubuntu and Windows with Python 3.11 and 3.12.
 
 ## License
 
